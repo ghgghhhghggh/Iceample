@@ -31,10 +31,8 @@ src-tauri/binaries/
 src-tauri/bridge/
 *.exe
 
-# Images and media — kept out of the repository on purpose (logo, app icons, installer banners)
-src/assets/
-src-tauri/icons/
-src-tauri/installer-assets/
+# Images and media — personal images and sounds must never be committed.
+# Only the app's own branding is allowed through (see the exceptions below).
 *.png
 *.jpg
 *.jpeg
@@ -49,6 +47,11 @@ src-tauri/installer-assets/
 *.flac
 *.webm
 *.mp4
+
+# Exceptions: app logo (needed by the web version), app icons, installer banners
+!src/assets/logo.png
+!src-tauri/icons/**
+!src-tauri/installer-assets/*.bmp
 
 # Local tooling
 .claude/
