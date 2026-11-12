@@ -2,7 +2,7 @@
 name = "iceample-vst-bridge"
 version = "2.1.0"
 description = "Iceample 32-bit out-of-process VST host bridge"
-authors = ["Soaho"]
+authors = ["Kyliann Chapel"]
 edition = "2021"
 
 # Standalone 32-bit (i686) host process. It loads 32-bit VST plugins that the
