@@ -157,12 +157,24 @@
   const i18nReady = import('./i18n.js').then(m => { tr = m.t }).catch(() => {})
   const msg = (key, fallback) => { const v = tr?.(key); return v && v !== key ? v : fallback }
 
+  const downloadUrl = () => document.querySelector('meta[name="iceample-download-url"]')?.content?.trim() || ''
+
   let lastDesktopToast = 0
   function desktopOnly(cmd) {
     const now = Date.now()
     if (now - lastDesktopToast > 2500) {
       lastDesktopToast = now
-      window.toast?.(msg('web_desktop_only', 'Available in the desktop app only'), 'info', 4000)
+      const url = downloadUrl()
+      window.toast?.(msg('web_desktop_only', 'Available in the desktop app only'), 'info', url ? 7000 : 4000)
+      // Same offer as the tool placeholders (desktop-only.js): a link, not a pop-up.
+      const toastEl = url && document.querySelector('#toast-stack .toast:last-child')
+      if (toastEl) {
+        const a = document.createElement('a')
+        a.className = 'toast-link'
+        a.href = url; a.target = '_blank'; a.rel = 'noopener'
+        a.textContent = msg('web_download_app', 'Download the app')
+        toastEl.appendChild(a)
+      }
     }
     return Promise.reject(`${msg('web_desktop_only', 'Available in the desktop app only')} (${cmd})`)
   }
@@ -274,11 +286,13 @@
   }
 
   // ── "Download the app" button ──────────────────────────────────────────────
-  // The installer URL comes from <meta name="iceample-download-url"> in index.html.
-  // While it is empty there is nothing to download, so no button is shown.
+  // The installer URL comes from <meta name="iceample-download-url"> in index.html;
+  // it feeds the links shown where a feature needs the desktop app. This permanent
+  // corner button is a separate opt-in: <meta name="iceample-download-button" content="on">.
   function addDownloadButton() {
-    const url = document.querySelector('meta[name="iceample-download-url"]')?.content?.trim()
-    if (!url || document.getElementById('web-download-btn')) return
+    const url = downloadUrl()
+    const enabled = document.querySelector('meta[name="iceample-download-button"]')?.content?.trim() === 'on'
+    if (!url || !enabled || document.getElementById('web-download-btn')) return
     const style = document.createElement('style')
     style.textContent = `
       #web-download-btn{position:fixed;top:10px;right:12px;z-index:50;display:inline-flex;align-items:center;gap:7px;

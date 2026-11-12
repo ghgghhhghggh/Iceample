@@ -14,6 +14,7 @@ import { t } from './i18n.js'
 import { promptName } from './rename-dialog.js'
 import { makeSendButton, imageMedia } from './media-bus.js'
 import { trackRecentFile } from './recent.js'
+import { renderDesktopOnly } from './desktop-only.js'
 
 const RAW_EXTS = ['cr2', 'cr3', 'nef', 'arw', 'raf', 'orf', 'rw2', 'dng', 'srw', 'pef']
 const LIBRAW_KEY = 'iceample:libraw:exe'
@@ -77,8 +78,7 @@ export function initRawTool(body) {
   injectStyles()
 
   if (!window.__TAURI__ || window.__ICEAMPLE_WEB__) {
-    body.innerHTML = '<div class="rw-tauri"><span></span></div>'
-    body.querySelector('span').textContent = t('raw_tauri_only')
+    renderDesktopOnly(body)
     return
   }
 

@@ -12,8 +12,10 @@
     <!-- Butterchurn (Milkdrop) visualiser — MIT, see vendor/butterchurn-LICENSE.txt -->
     <script src="vendor/butterchurn.min.js"></script>
     <script src="vendor/butterchurn-presets-minimal.min.js"></script>
-    <!-- Web version only: installer URL for the "Download the app" button (no button while empty) -->
+    <!-- Web version only: installer URL, linked wherever a feature needs the desktop app (no link while empty) -->
     <meta name="iceample-download-url" content="" />
+    <!-- Web version only: "on" also shows a permanent "Download the app" button in the corner -->
+    <meta name="iceample-download-button" content="off" />
     <!-- Browser stand-in for window.__TAURI__ — does nothing inside the desktop app -->
     <script src="web-shim.js"></script>
     <script type="module" src="main.js" defer></script>

@@ -1,6 +1,7 @@
 // converter.js — Convertisseur universel (images, audio, vidéo, documents, PDF)
 
 import { trackRecentFile } from './recent.js'
+import { renderDesktopOnly } from './desktop-only.js'
 
 function invoke(cmd, args) { return window.__TAURI__.core.invoke(cmd, args) }
 
@@ -752,7 +753,7 @@ function buildImgToPdf(wrap) {
 
 export function initConverter(body) {
   if (!window.__TAURI__ || window.__ICEAMPLE_WEB__) {
-    body.innerHTML = '<div style="padding:24px;color:#888;font-size:12px;">Disponible uniquement dans l\'application Tauri.</div>'
+    renderDesktopOnly(body)
     return
   }
 

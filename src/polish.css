@@ -202,3 +202,27 @@ input[type="radio"]    { accent-color: var(--color-active); }
 .toast-success { border-color: color-mix(in srgb, var(--vu-color-low)  35%, var(--win-border)); }
 .toast-error   { border-color: color-mix(in srgb, var(--vu-color-high) 35%, var(--win-border)); }
 .toast-out { opacity: 0; transform: translateY(6px); }
+
+/* ── Web version: tool / feature that needs the desktop app ───────────────── */
+.desktop-only {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  height: 100%; padding: 24px 28px; text-align: center;
+  color: var(--text-secondary); font-size: 12px; background: var(--surface);
+}
+.desktop-only p { margin: 0; max-width: 320px; line-height: 1.5; }
+.desktop-only-icon { font-size: 26px; opacity: .55; }
+.desktop-only-link {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; text-decoration: none;
+  color: var(--text-primary); border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  transition: background .15s;
+}
+.desktop-only-link:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.desktop-only-link i { color: var(--accent); }
+.toast .toast-link {
+  margin-left: 6px; pointer-events: auto; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 5px;
+  color: var(--accent); font-weight: 600; text-decoration: underline;
+}
