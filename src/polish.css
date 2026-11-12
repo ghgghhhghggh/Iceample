@@ -1,0 +1,204 @@
+/* ════════════════════════════════════════════════════════════════
+   polish.css — couche purement esthétique (additive).
+   Chargée APRÈS styles.css. Style PLAT et moderne : ombres douces et
+   nettes, pas de reflets/dégradés/halos (on évite la vibe « Aero/Vista »).
+   N'utilise que les variables de thème → compatible tous les thèmes.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Déplacement animé lors du rangement (« Ranger les fenêtres ») ── */
+.tool-win.arranging {
+  transition: left .3s cubic-bezier(.2,.8,.2,1), top .3s cubic-bezier(.2,.8,.2,1),
+              box-shadow .18s ease, border-color .18s ease;
+}
+
+/* ── Fenêtres flottantes : ombre douce, plate ───────────────────── */
+.tool-win {
+  box-shadow: 0 8px 24px -10px rgba(0,0,0,0.55);
+  transition: box-shadow .18s ease, border-color .18s ease;
+}
+/* Fenêtre active : simple bord accent + ombre un peu plus marquée (aucun halo) */
+.tool-win.focused {
+  border-color: var(--color-active);
+  box-shadow: 0 12px 30px -12px rgba(0,0,0,0.62);
+}
+.tool-win-title { transition: color .18s ease; }
+.tool-win.focused .tool-win-title { color: var(--text); }
+
+/* ── Boutons : feedback discret (léger soulèvement, pas de glow) ── */
+button {
+  transition: background .14s ease, color .14s ease, border-color .14s ease,
+              transform .1s ease;
+}
+.seq-btn:hover, .icon-btn:hover { transform: translateY(-1px); }
+.seq-btn:active, .icon-btn:active { transform: translateY(0); }
+.ctx-item:hover, .tool-picker-item:hover { transform: translateX(2px); }
+
+/* ── Menu contextuel : ombre nette, plate ───────────────────────── */
+#ctx-menu {
+  box-shadow: 0 10px 28px -10px rgba(0,0,0,0.6);
+}
+
+/* ── Champs : bord accent net au focus (pas de halo) ────────────── */
+input:focus, select:focus, textarea:focus {
+  border-color: var(--color-active);
+}
+
+/* ── Panneaux centrés (paramètres / à propos) : ombre nette ─────── */
+#panel-settings, #panel-about {
+  box-shadow: 0 18px 50px -18px rgba(0,0,0,0.7);
+}
+
+/* ── Scrollbars : se colorent légèrement au survol ──────────────── */
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-active) 55%, transparent);
+}
+
+/* ── RTL (arabe) : miroir de l'interface, mais curseurs et valeurs
+   numériques restent en sens normal (gauche → droite). ──────────── */
+[dir="rtl"] input[type="range"],
+[dir="rtl"] input[type="number"],
+[dir="rtl"] .seq-bpm { direction: ltr; }
+
+/* ════════════════════════════════════════════════════════════════
+   Couche « moderne » — animations d'entrée, contrôles natifs thémés,
+   dock en pilule, focus clavier. Toujours 100 % variables de thème ;
+   reduce-motion neutralise toutes les animations via la règle globale.
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── Contrôles natifs : suivent le thème partout, sans rien casser.
+   :where() = spécificité nulle → n'importe quel style d'outil gagne. ── */
+input[type="range"]    { accent-color: var(--slider-color); }
+input[type="checkbox"],
+input[type="radio"]    { accent-color: var(--color-active); }
+:where(select) {
+  background: var(--bg); color: var(--text-primary);
+  border: 1px solid var(--win-border); border-radius: 6px;
+  font-family: inherit; padding: 3px 8px;
+}
+:where(input[type="text"], input[type="number"], input[type="url"], textarea) {
+  font-family: inherit;
+}
+
+/* Focus clavier visible (souris : rien ne change) */
+:where(button, select, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-active) 75%, transparent);
+  outline-offset: 1px;
+}
+
+/* ── Animations d'entrée des menus / popovers ───────────────────── */
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(5px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+#ctx-menu:not(.hidden),
+#ctx-submenu,
+#tool-picker:not(.hidden),
+#dock-menu:not(.hidden),
+.daw-lane-color-picker {
+  animation: pop-in .14s cubic-bezier(.2,.8,.2,1);
+  transform-origin: top left;
+}
+#ctx-menu, #ctx-submenu, #tool-picker, #dock-menu { border-radius: 10px; }
+
+/* Panneaux centrés : fond qui fond, carte qui surgit */
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+#settings-overlay:not(.hidden), #about-overlay:not(.hidden) { animation: fade-in .16s ease; }
+#settings-overlay:not(.hidden) #panel-settings,
+#about-overlay:not(.hidden) #panel-about { animation: pop-in .2s cubic-bezier(.2,.8,.2,1); }
+
+/* ── Apparition des fenêtres d'outil ────────────────────────────────
+   .win-enter est posé par window-manager quand la fenêtre ne joue pas
+   déjà un bounce de bord (sinon les deux transforms se battraient). */
+@keyframes win-in {
+  from { opacity: .5; transform: scale(.972); }
+  to   { opacity: 1;  transform: none; }
+}
+.tool-win.win-enter { animation: win-in .18s cubic-bezier(.2,.8,.2,1); }
+
+/* ── Dock rapide : pilule translucide, boutons fantômes ─────────── */
+#quick-dock {
+  padding: 4px;
+  background: color-mix(in srgb, var(--surface) 74%, transparent);
+  border: 1px solid var(--win-border);
+  border-radius: 11px;
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+  box-shadow: 0 6px 18px -8px rgba(0,0,0,.55);
+}
+#quick-dock .dock-btn,
+#quick-dock #dock-menu-btn {
+  background: transparent;
+  border-color: transparent;
+  border-radius: 7px;
+}
+#quick-dock .dock-btn:hover,
+#quick-dock #dock-menu-btn:hover {
+  background: color-mix(in srgb, var(--text-primary) 9%, transparent);
+  transform: translateY(-1px);
+}
+#quick-dock .dock-btn.open {
+  background: color-mix(in srgb, var(--color-active) 14%, transparent);
+  border-color: transparent;
+}
+.dock-btn.open::after {
+  content: ''; position: absolute; bottom: 1px; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--color-active);
+}
+
+/* ── Aperçu d'ancrage (drag vers un bord → moitié / plein écran) ── */
+#snap-preview {
+  position: absolute; z-index: 8; pointer-events: none;
+  background: color-mix(in srgb, var(--color-active) 11%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--color-active) 55%, transparent);
+  border-radius: var(--win-radius);
+  opacity: 0;
+  transition: opacity .13s ease,
+              left .15s cubic-bezier(.2,.8,.2,1), top .15s cubic-bezier(.2,.8,.2,1),
+              width .15s cubic-bezier(.2,.8,.2,1), height .15s cubic-bezier(.2,.8,.2,1);
+}
+#snap-preview.show { opacity: 1; }
+
+/* ── Boutons de barre de titre (agrandir / fermer) ──────────────── */
+.tool-win-max {
+  background: none; border: none; color: var(--dim);
+  width: 22px; height: 22px; border-radius: 4px;
+  cursor: pointer; font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.12s, background 0.12s;
+}
+.tool-win-max:hover { color: var(--color-active); background: color-mix(in srgb, var(--color-active) 12%, transparent); }
+.tool-win-max:active { transform: scale(0.92); }
+
+/* ── Toasts v2 : pile en bas, thémés, avec icône ────────────────── */
+#toast-stack {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  z-index: 99999; pointer-events: none;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(.97); }
+  to   { opacity: 1; transform: none; }
+}
+.toast {
+  display: flex; align-items: center; gap: 9px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--win-border);
+  border-radius: 9px;
+  padding: 9px 16px;
+  font-size: 12px; color: var(--text-primary);
+  box-shadow: 0 8px 24px -8px rgba(0,0,0,.6);
+  max-width: 480px; text-align: left;
+  animation: toast-in .2s cubic-bezier(.2,.8,.2,1);
+  transition: opacity .25s ease, transform .25s ease;
+}
+.toast i { font-size: 13px; flex-shrink: 0; }
+.toast-info    i { color: var(--color-active); }
+.toast-success i { color: var(--vu-color-low); }
+.toast-error   i { color: var(--vu-color-high); }
+.toast-info    { border-color: color-mix(in srgb, var(--color-active)  35%, var(--win-border)); }
+.toast-success { border-color: color-mix(in srgb, var(--vu-color-low)  35%, var(--win-border)); }
+.toast-error   { border-color: color-mix(in srgb, var(--vu-color-high) 35%, var(--win-border)); }
+.toast-out { opacity: 0; transform: translateY(6px); }

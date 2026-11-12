@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Iceample</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="polish.css" />
+    <!-- Butterchurn (Milkdrop) visualiser — MIT, see vendor/butterchurn-LICENSE.txt -->
+    <script src="vendor/butterchurn.min.js"></script>
+    <script src="vendor/butterchurn-presets-minimal.min.js"></script>
+    <!-- Web version only: installer URL for the "Download the app" button (no button while empty) -->
+    <meta name="iceample-download-url" content="" />
+    <!-- Browser stand-in for window.__TAURI__ — does nothing inside the desktop app -->
+    <script src="web-shim.js"></script>
+    <script type="module" src="main.js" defer></script>
+  </head>
+  <body>
+
+    <!-- SPLASH SCREEN -->
+    <div id="splash">
+      <div id="splash-logo-wrap">
+        <img id="splash-logo" src="assets/logo.png" alt="Iceample" />
+        <div id="splash-glow"></div>
+      </div>
+      <div id="splash-wordmark">ICEAMPLE</div>
+      <div id="splash-hint" data-i18n="splash_hint">Cliquer pour lancer</div>
+    </div>
+
+    <!-- APP -->
+    <div id="app" class="hidden">
+
+      <!-- clic droit -->
+      <div id="ctx-menu" class="hidden"></div>
+
+      <!-- fenêtre paramètres centrée -->
+      <div id="settings-overlay" class="hidden">
+        <div id="panel-settings">
+          <div id="panel-settings-header">
+            <span data-i18n="settings">Paramètres</span>
+            <button id="btn-settings-close" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div id="panel-settings-body">
+            <nav id="settings-nav">
+              <button class="settings-nav-btn active" data-tab="peripherique">
+                <i class="fa-solid fa-plug"></i><span data-i18n="tab_device">Périphérique</span>
+              </button>
+              <button class="settings-nav-btn" data-tab="audio">
+                <i class="fa-solid fa-wave-square"></i><span data-i18n="tab_audio">Audio</span>
+              </button>
+              <button class="settings-nav-btn" data-tab="affichage">
+                <i class="fa-solid fa-display"></i><span data-i18n="tab_display">Affichage</span>
+              </button>
+              <button class="settings-nav-btn" data-tab="theme">
+                <i class="fa-solid fa-palette"></i><span data-i18n="tab_theme">Thème</span>
+              </button>
+              <button class="settings-nav-btn" data-tab="raccourcis">
+                <i class="fa-solid fa-keyboard"></i><span data-i18n="tab_shortcuts">Raccourcis</span>
+              </button>
+              <button class="settings-nav-btn" data-tab="langue">
+                <i class="fa-solid fa-language"></i><span data-i18n="tab_lang">Langue</span>
+              </button>
+            </nav>
+            <div id="settings-tabs">
+              <div class="settings-tab" id="tab-theme">
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_workbench_bg">Fond workbench</label>
+                  <input class="theme-color" type="color" id="th-workbench-bg" value="#0a0a0a" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_text_primary">Texte principal</label>
+                  <input class="theme-color" type="color" id="th-text-primary" value="#e0e0e0" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_text_secondary">Texte secondaire</label>
+                  <input class="theme-color" type="color" id="th-text-secondary" value="#888888" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_color_active">Couleur active</label>
+                  <input class="theme-color" type="color" id="th-color-active" value="#4a9eff" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_color_active2">Accent secondaire</label>
+                  <input class="theme-color" type="color" id="th-color-active-2" value="#4a9eff" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_slider_color">Jauges</label>
+                  <input class="theme-color" type="color" id="th-slider-color" value="#4a9eff" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_win_border">Bordure fenêtre</label>
+                  <input class="theme-color" type="color" id="th-win-border" value="#2a2a2a" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_win_border_in">Bordure intérieure</label>
+                  <input class="theme-color" type="color" id="th-win-border-in" value="#1e1e1e" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_surface">Fond des panneaux</label>
+                  <input class="theme-color" type="color" id="th-surface" value="#141414" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_btn_primary">Bouton principal</label>
+                  <input class="theme-color" type="color" id="th-btn-primary" value="#4a9eff" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_daw_clip">Clips piste audio</label>
+                  <input class="theme-color" type="color" id="th-daw-clip" value="#6c5ce7" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_master_color">Master (accent)</label>
+                  <input class="theme-color" type="color" id="th-master-color" value="#8a6820" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_vu_low">VU bas (vert)</label>
+                  <input class="theme-color" type="color" id="th-vu-low" value="#20be3c" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_vu_mid">VU moyen (jaune)</label>
+                  <input class="theme-color" type="color" id="th-vu-mid" value="#d2c314" />
+                </div>
+                <div class="theme-row">
+                  <label class="theme-label" data-i18n="th_vu_high">VU haut (rouge)</label>
+                  <input class="theme-color" type="color" id="th-vu-high" value="#dc281e" />
+                </div>
+                <div class="theme-row theme-reset-row">
+                  <button class="theme-reset-btn" id="theme-reset-btn">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    <span data-i18n="th_reset">Réinitialiser</span>
+                  </button>
+                </div>
+              </div>
+              <div class="settings-tab active" id="tab-peripherique">
+                <div class="device-section">
+                  <div class="device-label"><i class="fa-solid fa-microphone"></i> <span data-i18n="dev_mic1">Entrée micro 1</span></div>
+                  <select class="device-select" id="dev-mic-1"><option>— aucun —</option></select>
+                </div>
+                <div class="device-section">
+                  <div class="device-label"><i class="fa-solid fa-microphone"></i> <span data-i18n="dev_mic2">Entrée micro 2</span></div>
+                  <select class="device-select" id="dev-mic-2"><option>— aucun —</option></select>
+                </div>
+                <div class="device-section">
+                  <div class="device-label"><i class="fa-solid fa-volume-high"></i> <span data-i18n="dev_out1">Sortie audio</span></div>
+                  <select class="device-select" id="dev-out-1"><option>— défaut système —</option></select>
+                </div>
+                <div class="device-section">
+                  <div class="device-label"><i class="fa-solid fa-headphones"></i> <span data-i18n="dev_out2">Sortie secondaire</span></div>
+                  <select class="device-select" id="dev-out-2"><option>— aucune —</option></select>
+                </div>
+                <div class="device-section">
+                  <div class="device-label"><i class="fa-solid fa-music"></i> <span data-i18n="dev_midi">Entrée MIDI</span></div>
+                  <select class="device-select" id="dev-midi-in"><option>— aucun —</option></select>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                  <button class="device-refresh-btn" id="dev-refresh">
+                    <i class="fa-solid fa-rotate"></i> <span data-i18n="dev_refresh">Actualiser</span>
+                  </button>
+                  <button class="device-refresh-btn" id="dev-allow">
+                    <i class="fa-solid fa-unlock"></i> <span data-i18n="dev_allow">Autoriser l'accès (noms réels)</span>
+                  </button>
+                </div>
+              </div>
+              <!-- New tabs — content injected by main.js -->
+              <div class="settings-tab" id="tab-langue"></div>
+              <div class="settings-tab" id="tab-audio"></div>
+              <div class="settings-tab" id="tab-affichage"></div>
+              <div class="settings-tab" id="tab-raccourcis"></div>
+            </div>
+          </div>
+          <div id="panel-settings-footer">
+            <button id="btn-about" class="settings-nav-btn">
+              <i class="fa-solid fa-circle-info"></i><span data-i18n="about">À propos</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- À propos overlay -->
+      <div id="about-overlay" class="hidden">
+        <div id="panel-about">
+          <div id="panel-about-header">
+            <span data-i18n="about">À propos</span>
+            <button id="btn-about-close" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+          <div id="panel-about-body">
+            <div class="about-logo-row">
+              <div class="about-logo-wrap">
+                <img src="assets/logo.png" alt="Iceample" class="about-logo" />
+              </div>
+              <div>
+                <div class="about-appname">Iceample</div>
+                <div class="about-version">v2.1 — Tauri Edition</div>
+              </div>
+            </div>
+            <p class="about-desc" data-i18n="about_desc">Logiciel de création musicale — sampler, séquenceur, piste audio.</p>
+            <div class="about-section-title" data-i18n="about_open_source">Composants open-source utilisés</div>
+            <div class="about-table">
+              <div class="about-row"><span class="about-lib">Tauri v2</span><span class="about-lic">MIT / Apache 2.0</span></div>
+              <div class="about-row"><span class="about-lib">Rust</span><span class="about-lic">MIT / Apache 2.0</span></div>
+              <div class="about-row"><span class="about-lib">cpal 0.15</span><span class="about-lic">Apache 2.0</span></div>
+              <div class="about-row"><span class="about-lib">midir 0.10</span><span class="about-lic">MIT</span></div>
+              <div class="about-row"><span class="about-lib">serde / serde_json</span><span class="about-lic">MIT / Apache 2.0</span></div>
+              <div class="about-row"><span class="about-lib">tauri-plugin-dialog</span><span class="about-lic">MIT / Apache 2.0</span></div>
+              <div class="about-row"><span class="about-lib">tauri-plugin-opener</span><span class="about-lic">MIT / Apache 2.0</span></div>
+              <div class="about-row"><span class="about-lib">libloading 0.8</span><span class="about-lic">MIT / Apache 2.0</span></div>
+              <div class="about-row"><span class="about-lib">crossbeam-channel 0.5</span><span class="about-lic">MIT / Apache 2.0</span></div>
+              <div class="about-row"><span class="about-lib">winapi 0.3 (Windows)</span><span class="about-lic">MIT</span></div>
+              <div class="about-row"><span class="about-lib">Pont VST 32 bits (iceample-vst-bridge)</span><span class="about-lic">Composant interne</span></div>
+              <div class="about-row"><span class="about-lib">Format VST2 (hébergement)</span><span class="about-lic">VST® — Steinberg</span></div>
+              <div class="about-row"><span class="about-lib">Format VST3 (hébergement)</span><span class="about-lic">VST® — Steinberg</span></div>
+              <div class="about-row"><span class="about-lib">Format CLAP (hébergement)</span><span class="about-lic">MIT</span></div>
+              <div class="about-row"><span class="about-lib">Butterchurn (Milkdrop)</span><span class="about-lic">MIT</span></div>
+              <div class="about-row"><span class="about-lib">Butterchurn presets</span><span class="about-lic">MIT</span></div>
+              <div class="about-row"><span class="about-lib">three.js r160</span><span class="about-lic">MIT</span></div>
+              <div class="about-row"><span class="about-lib">postprocessing 6.38.3</span><span class="about-lic">Zlib</span></div>
+              <div class="about-row"><span class="about-lib">react-bits (effets, portés en vanilla)</span><span class="about-lic">MIT + Commons Clause</span></div>
+              <div class="about-row"><span class="about-lib">yt-dlp</span><span class="about-lic">The Unlicense</span></div>
+              <div class="about-row"><span class="about-lib">FFmpeg</span><span class="about-lic">LGPL 2.1</span></div>
+              <div class="about-row"><span class="about-lib">Font Awesome 6 Free</span><span class="about-lic">CC BY 4.0 / SIL OFL / MIT</span></div>
+              <div class="about-row"><span class="about-lib">Web Audio API</span><span class="about-lic">Standard W3C</span></div>
+              <div class="about-row"><span class="about-lib">Web MIDI API</span><span class="about-lic">Standard W3C</span></div>
+              <div class="about-row"><span class="about-lib">WebGL2 API</span><span class="about-lic">Standard W3C</span></div>
+              <div class="about-row"><span class="about-lib">MediaRecorder API</span><span class="about-lic">Standard W3C</span></div>
+              <div class="about-row"><span class="about-lib">Canvas 2D API</span><span class="about-lic">Standard W3C</span></div>
+            </div>
+            <div class="about-note">
+              <i class="fa-solid fa-circle-check"></i>
+              <span data-i18n="about_free">Tous les composants sont libres pour une utilisation commerciale.</span>
+            </div>
+            <div class="about-foot">
+              <div class="about-attr">
+                Icons by <strong>Font Awesome</strong> — <span data-i18n="about_icons">attribution requise (CC BY 4.0) :</span><br>
+                <span class="about-attr-url">fontawesome.com</span>
+              </div>
+              <div class="about-attr">
+                <span data-i18n="about_vst">VST® est une marque déposée de Steinberg Media Technologies GmbH. Iceample n'est pas affilié à Steinberg.</span>
+              </div>
+              <div class="about-attr">
+                <span data-i18n="about_butterchurn">Visualiseur « Milkdrop » via Butterchurn © 2013–2018 Jordan Berg (MIT). Presets MilkDrop par la communauté.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- WORKBENCH -->
+      <div id="workbench">
+        <div id="tool-picker" class="hidden">
+          <div id="tool-picker-list"></div>
+        </div>
+      </div>
+
+    </div>
+
+  </body>
+</html>

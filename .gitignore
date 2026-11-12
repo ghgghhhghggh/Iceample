@@ -1,0 +1,54 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Rust build output
+target/
+
+# Bundled third-party binaries (ffmpeg, yt-dlp: too large for GitHub) and built executables
+src-tauri/binaries/
+src-tauri/bridge/
+*.exe
+
+# Images and media — kept out of the repository on purpose (logo, app icons, installer banners)
+src/assets/
+src-tauri/icons/
+src-tauri/installer-assets/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.bmp
+*.ico
+*.icns
+*.wav
+*.mp3
+*.ogg
+*.flac
+*.webm
+*.mp4
+
+# Local tooling
+.claude/

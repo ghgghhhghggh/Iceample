@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Démo bordures fenêtres</title>
+<style>
+  :root{ --surface:#141414; --border:#2a2a2a; --accent:#4a9eff; --text:#e0e0e0; --dim:#888; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0a0a0a;color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;padding:30px;}
+  h1{font-size:15px;font-weight:600;margin-bottom:4px}
+  p.sub{font-size:12px;color:var(--dim);margin-bottom:26px}
+  .case{margin-bottom:34px}
+  .case h2{font-size:12px;font-weight:600;letter-spacing:.04em;margin-bottom:10px}
+  .case .note{font-size:11px;color:var(--dim);margin-top:8px}
+  .stage{position:relative;height:120px}
+  .win{
+    position:absolute;top:0;width:230px;height:110px;
+    background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    box-shadow:0 8px 24px -10px rgba(0,0,0,.55);
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+  .win.focused{border-color:var(--accent)}
+  .bar{height:30px;border-bottom:1px solid #1e1e1e;display:flex;align-items:center;padding:0 10px;
+       font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#bbb}
+  .body{flex:1}
+  .ok{color:#4aff88}.bad{color:#ff6b6b}
+  /* Case A — collé (gap 0) : 2 bordures = trait 2px */
+  .A .w1{left:0}
+  .A .w2{left:230px}      /* w1.right (0+230) = w2.left → bords adjacents = 2px */
+  /* Case B — chevauchement 1px : bordure partagée */
+  .B .w1{left:0}
+  .B .w2{left:229px}      /* 1px de recouvrement → les 2 bordures fusionnent */
+  /* Case C — écart 6px */
+  .C .w1{left:0}
+  .C .w2{left:236px}
+  .zoom{font-size:11px;color:var(--dim);margin-top:40px;border-top:1px solid #222;padding-top:14px}
+</style>
+</head>
+<body>
+  <h1>Bordures entre deux fenêtres collées</h1>
+  <p class="sub">Regarde le trait vertical au milieu de chaque paire.</p>
+
+  <div class="case A">
+    <h2><span class="bad">A — « comme avant » (collé pile)</span></h2>
+    <div class="stage">
+      <div class="win w1"><div class="bar">Fenêtre 1</div><div class="body"></div></div>
+      <div class="win w2 focused"><div class="bar">Fenêtre 2</div><div class="body"></div></div>
+    </div>
+    <div class="note">→ deux bordures de 1px côte à côte = trait épais de <b>2px</b> (l'effet qui te dérange).</div>
+  </div>
+
+  <div class="case B">
+    <h2><span class="ok">B — maintenant (recouvrement de 1px)</span></h2>
+    <div class="stage">
+      <div class="win w1"><div class="bar">Fenêtre 1</div><div class="body"></div></div>
+      <div class="win w2 focused"><div class="bar">Fenêtre 2</div><div class="body"></div></div>
+    </div>
+    <div class="note">→ les deux bordures se superposent en <b>une seule ligne de 1px</b> : collé, sans double trait.
+       (Petit bémol : aux coins arrondis, il reste un mini-creux.)</div>
+  </div>
+
+  <div class="case C">
+    <h2>C — avec écart de 6px (la version d'il y a 2 messages)</h2>
+    <div class="stage">
+      <div class="win w1"><div class="bar">Fenêtre 1</div><div class="body"></div></div>
+      <div class="win w2 focused"><div class="bar">Fenêtre 2</div><div class="body"></div></div>
+    </div>
+    <div class="note">→ propre, mais visiblement séparé (pas « collé »).</div>
+  </div>
+
+  <div class="zoom">Astuce : zoome (Ctrl + molette) pour bien voir l'épaisseur du trait central de chaque cas.</div>
+</body>
+</html>
