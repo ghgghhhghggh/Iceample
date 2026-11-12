@@ -1,0 +1,85 @@
+Iceample — Licence propriétaire / Proprietary License
+
+Copyright (c) 2026 Soaho. Tous droits réservés. All rights reserved.
+
+
+──────────────────────────────── FRANÇAIS ────────────────────────────────
+
+Le code source de ce dépôt est publié pour consultation uniquement. Ce
+n'est pas un logiciel libre ou open source.
+
+Ce qui est autorisé
+  • Lire le code source de ce dépôt.
+  • Utiliser l'application Iceample telle qu'elle est distribuée par
+    l'auteur (version web officielle et installateurs officiels).
+  • Ce que vous créez avec Iceample (sons, images, vidéos, projets) vous
+    appartient.
+
+Ce qui est interdit sans l'accord écrit préalable de l'auteur
+  • Copier, modifier, fusionner, publier, redistribuer, vendre, louer ou
+    concéder en sous-licence tout ou partie de ce code.
+  • Créer des œuvres dérivées de ce code ou l'intégrer à un autre projet.
+  • Héberger ou distribuer une copie, modifiée ou non, de l'application.
+  • Utiliser le nom « Iceample », son logo ou ses icônes pour un autre
+    produit ou service.
+
+Consulter ou « forker » ce dépôt au moyen des fonctions de GitHub, dans la
+limite de ce que prévoient ses conditions d'utilisation, ne vous accorde
+aucun autre droit.
+
+Composants tiers
+Les bibliothèques incluses ou utilisées par ce projet (notamment celles du
+dossier src/vendor : three.js, postprocessing, Butterchurn et ses presets,
+ainsi que Font Awesome, Tauri et les dépendances Rust et npm) restent
+soumises à leurs propres licences, qui continuent de s'appliquer. La
+présente licence ne les concerne pas.
+
+Absence de garantie
+Le logiciel est fourni « en l'état », sans garantie d'aucune sorte,
+expresse ou implicite. L'auteur ne pourra être tenu responsable d'aucun
+dommage lié à son utilisation.
+
+Pour toute demande d'autorisation, ouvrez une « issue » sur le dépôt
+GitHub du projet.
+
+
+──────────────────────────────── ENGLISH ─────────────────────────────────
+
+The source code in this repository is published for viewing only. It is
+not free or open-source software.
+
+Permitted
+  • Reading the source code in this repository.
+  • Using the Iceample application as distributed by the author (official
+    web version and official installers).
+  • Whatever you create with Iceample (sounds, images, videos, projects)
+    belongs to you.
+
+Not permitted without the author's prior written permission
+  • Copying, modifying, merging, publishing, redistributing, selling,
+    renting or sublicensing all or part of this code.
+  • Creating derivative works from this code or including it in another
+    project.
+  • Hosting or distributing a copy of the application, modified or not.
+  • Using the name "Iceample", its logo or its icons for another product
+    or service.
+
+Viewing or forking this repository through GitHub's features, to the
+extent provided by GitHub's Terms of Service, grants you no other rights.
+
+Third-party components
+Libraries included in or used by this project (in particular those in
+src/vendor: three.js, postprocessing, Butterchurn and its presets, as well
+as Font Awesome, Tauri and the Rust and npm dependencies) remain under
+their own licenses, which continue to apply. This license does not cover
+them.
+
+No warranty
+The software is provided "as is", without warranty of any kind, express or
+implied. The author shall not be liable for any damages arising from its
+use.
+
+For permission requests, open an issue on the project's GitHub repository.
+
+In case of discrepancy between the two versions, the French version
+prevails.
