@@ -49,7 +49,7 @@ export function initRecorder(body) {
     for (const [b, m] of [[screenBtn, 'screen'], [camBtn, 'webcam']]) {
       const on = source === m
       b.style.background = on ? 'var(--color-active,#4a9eff)' : 'var(--surface,#111)'
-      b.style.color = on ? '#fff' : 'var(--text-secondary,#999)'
+      b.style.color = on ? 'var(--on-accent)' : 'var(--text-secondary,#999)'
     }
   }
   refreshSeg()
@@ -71,13 +71,13 @@ export function initRecorder(body) {
   const recBtn = document.createElement('button')
   recBtn.title = t('vr_record')
   recBtn.innerHTML = '<i class="fa-solid fa-circle"></i>'
-  recBtn.style.cssText = 'width:36px;height:36px;border-radius:50%;border:none;cursor:pointer;background:#e0334c;color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;'
+  recBtn.style.cssText = 'width:36px;height:36px;border-radius:50%;border:none;cursor:pointer;background:var(--danger);color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;'
 
   bar.append(segWrap, micLbl, makeInputSwitch('recorder', ''), spacer, timeLbl, recBtn)
 
   // ── Preview ────────────────────────────────────────────────────────────────
   const previewBox = document.createElement('div')
-  previewBox.style.cssText = 'flex:1;min-height:120px;display:flex;align-items:center;justify-content:center;background:#000;overflow:hidden;position:relative;'
+  previewBox.style.cssText = 'flex:1;min-height:120px;display:flex;align-items:center;justify-content:center;background:var(--preview-bg);overflow:hidden;position:relative;'
   const liveVid = document.createElement('video')
   liveVid.muted = true; liveVid.autoplay = true; liveVid.playsInline = true
   liveVid.style.cssText = 'max-width:100%;max-height:100%;display:none;'
@@ -174,7 +174,7 @@ export function initRecorder(body) {
     const row = document.createElement('div')
     row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 10px;border-bottom:1px solid var(--win-border-in,#1e1e1e);'
     const img = document.createElement('img')
-    img.style.cssText = 'width:56px;height:32px;object-fit:cover;border-radius:4px;background:#000;flex-shrink:0;'
+    img.style.cssText = 'width:56px;height:32px;object-fit:cover;border-radius:4px;background:var(--preview-bg);flex-shrink:0;'
     const label = document.createElement('span')
     label.style.cssText = 'flex:1;min-width:0;font-size:11px;color:var(--text-primary,#ddd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
     label.textContent = take.name + ' · ' + fmtElapsed(take.duration)

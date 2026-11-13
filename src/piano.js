@@ -5,6 +5,7 @@ import { t } from './i18n.js'
 import { getBpm, onBpmChange } from './tempo.js'
 import { promptName } from './rename-dialog.js'
 import { registerTool } from './project.js'
+import { themeColor } from './theme.js'
 
 const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']
 const WHITE  = [0,2,4,5,7,9,11]
@@ -67,13 +68,13 @@ function injectStyles() {
 }
 .piano-label { font-size: 10px; color: var(--dim); letter-spacing: 0.06em; }
 .piano-octave-btn {
-  width: 22px; height: 22px; background: #1a1a1a;
+  width: 22px; height: 22px; background: var(--surface2);
   border: 1px solid var(--win-border); border-radius: 4px;
   color: var(--text-secondary); font-size: 13px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; line-height: 1; font-family: inherit;
 }
-.piano-octave-btn:hover { background: #242424; color: var(--text-primary); }
+.piano-octave-btn:hover { background: color-mix(in srgb, var(--surface2), var(--text-primary) 10%); color: var(--text-primary); }
 .piano-octave-val {
   font-size: 13px; font-weight: 700; color: var(--text-primary);
   min-width: 16px; text-align: center;
@@ -82,11 +83,11 @@ function injectStyles() {
 .piano-vol-wrap span { font-size: 10px; color: var(--dim); }
 .piano-vol {
   width: 70px; -webkit-appearance: none; appearance: none;
-  height: 3px; background: #2a2a2a; border-radius: 2px; outline: none; cursor: pointer;
+  height: 3px; background: var(--win-border); border-radius: 2px; outline: none; cursor: pointer;
 }
 .piano-vol::-webkit-slider-thumb {
   -webkit-appearance: none; width: 10px; height: 10px;
-  border-radius: 50%; background: var(--color-active); cursor: pointer;
+  border-radius: 50%; background: var(--slider-color); cursor: pointer;
 }
 .piano-note-display {
   font-size: 10px; color: var(--color-active); min-width: 36px;
@@ -100,15 +101,15 @@ function injectStyles() {
 .piano-sample-name.loaded { color: var(--color-active); }
 .piano-btn {
   height: 22px; padding: 0 8px; border-radius: 4px;
-  background: #1a1a1a; border: 1px solid var(--win-border);
+  background: var(--surface2); border: 1px solid var(--win-border);
   color: var(--text-secondary); font-size: 10px; font-weight: 600;
   letter-spacing: 0.05em; cursor: pointer; font-family: inherit;
   display: flex; align-items: center; gap: 4px; white-space: nowrap; flex-shrink: 0;
 }
-.piano-btn:hover { background: #242424; color: var(--text-primary); }
+.piano-btn:hover { background: color-mix(in srgb, var(--surface2), var(--text-primary) 10%); color: var(--text-primary); }
 .piano-btn:disabled { opacity: 0.35; cursor: default; pointer-events: none; }
-.piano-btn.active { background: color-mix(in srgb, #dc281e 20%, #000); border-color: #dc281e; color: #dc281e; }
-.piano-btn.accent { background: color-mix(in srgb, var(--color-active) 15%, #000); border-color: var(--color-active); color: var(--color-active); }
+.piano-btn.active { background: color-mix(in srgb, var(--danger) 20%, var(--surface2)); border-color: var(--danger); color: var(--danger); }
+.piano-btn.accent { background: color-mix(in srgb, var(--color-active) 15%, var(--surface2)); border-color: var(--color-active); color: var(--color-active); }
 .piano-root-val {
   font-size: 12px; font-weight: 700; color: var(--text-primary);
   min-width: 28px; text-align: center;
@@ -116,7 +117,7 @@ function injectStyles() {
 .piano-clip-tile {
   display: flex; align-items: center; gap: 5px; margin-left: auto;
   height: 22px; padding: 0 8px; border-radius: 4px;
-  background: color-mix(in srgb, var(--color-active) 12%, #000);
+  background: color-mix(in srgb, var(--color-active) 12%, var(--surface2));
   border: 1px solid var(--color-active); color: var(--color-active);
   font-size: 10px; font-weight: 600; cursor: grab; white-space: nowrap; flex-shrink: 0;
   user-select: none;
@@ -129,13 +130,13 @@ function injectStyles() {
 .psyn-waves { display: flex; gap: 3px; margin-left: 2px; }
 .psyn-wave {
   height: 22px; min-width: 32px; padding: 0 6px; border-radius: 4px;
-  background: #1a1a1a; border: 1px solid var(--win-border);
+  background: var(--surface2); border: 1px solid var(--win-border);
   color: var(--text-secondary); font-size: 9px; font-weight: 700;
   letter-spacing: 0.04em; cursor: pointer; font-family: inherit;
 }
-.psyn-wave:hover { background: #242424; color: var(--text-primary); }
+.psyn-wave:hover { background: color-mix(in srgb, var(--surface2), var(--text-primary) 10%); color: var(--text-primary); }
 .psyn-wave.active {
-  background: color-mix(in srgb, var(--color-active) 15%, #000);
+  background: color-mix(in srgb, var(--color-active) 15%, var(--surface2));
   border-color: var(--color-active); color: var(--color-active);
 }
 .piano-synth-panel {
@@ -147,18 +148,18 @@ function injectStyles() {
 .psyn-lbl { font-size: 9px; color: var(--dim); letter-spacing: 0.06em; min-width: 26px; }
 .psyn-slider {
   flex: 1; -webkit-appearance: none; appearance: none;
-  height: 3px; background: #2a2a2a; border-radius: 2px; outline: none; cursor: pointer;
+  height: 3px; background: var(--win-border); border-radius: 2px; outline: none; cursor: pointer;
 }
 .psyn-slider::-webkit-slider-thumb {
   -webkit-appearance: none; width: 10px; height: 10px;
-  border-radius: 50%; background: var(--color-active); cursor: pointer;
+  border-radius: 50%; background: var(--slider-color); cursor: pointer;
 }
 .piano-kb-wrap {
   flex: 1; display: flex; align-items: stretch;
   padding: 0; position: relative; overflow: hidden;
 }
 .piano-roll-wrap { flex: 1; min-height: 0; display: flex; overflow: hidden; }
-.roll-scroll { flex: 1; overflow: auto; background: #0c0c0c; }
+.roll-scroll { flex: 1; overflow: auto; background: var(--preview-bg); }
 .roll-inner { position: relative; }
 .roll-grid  { position: absolute; inset: 0; display: block; }
 .roll-notes { position: absolute; inset: 0; }
@@ -176,7 +177,7 @@ function injectStyles() {
 .roll-note:hover { background: color-mix(in srgb, var(--color-active) 85%, #000); }
 .roll-playhead {
   position: absolute; top: 0; bottom: 0; width: 2px;
-  background: #e8d24a; pointer-events: none; z-index: 5;
+  background: var(--warning); pointer-events: none; z-index: 5;
 }
 .piano-kb {
   position: relative; display: flex; flex-shrink: 0; width: 100%; height: 100%;
@@ -204,14 +205,14 @@ function injectStyles() {
 .piano-black.active { background: color-mix(in srgb, var(--color-active) 80%, #000); }
 .piano-mode-btn {
   height: 22px; padding: 0 8px; border-radius: 4px;
-  background: #1a1a1a; border: 1px solid var(--win-border);
+  background: var(--surface2); border: 1px solid var(--win-border);
   color: var(--text-secondary); font-size: 10px; font-weight: 600;
   letter-spacing: 0.05em; cursor: pointer; font-family: inherit;
   display: flex; align-items: center; gap: 4px; white-space: nowrap;
 }
 .piano-mode-btn.vst-active {
-  background: color-mix(in srgb, #a855f7 15%, #000);
-  border-color: #a855f7; color: #a855f7;
+  background: color-mix(in srgb, var(--color-active) 15%, var(--surface2));
+  border-color: var(--color-active); color: var(--color-active);
 }
 `
   document.head.appendChild(s)
@@ -222,21 +223,21 @@ function showVstPicker(vsts, onPick) {
   overlay.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;`
 
   const box = document.createElement('div')
-  box.style.cssText = `background:#1a1a1a;border:1px solid #333;border-radius:8px;width:380px;max-height:420px;display:flex;flex-direction:column;overflow:hidden;`
+  box.style.cssText = `background:var(--surface);border:1px solid var(--win-border);border-radius:8px;width:380px;max-height:420px;display:flex;flex-direction:column;overflow:hidden;`
 
   const hdr = document.createElement('div')
-  hdr.style.cssText = `padding:10px 14px;border-bottom:1px solid #2a2a2a;font-size:12px;font-weight:700;color:#e0e0e0;display:flex;justify-content:space-between;align-items:center;`
-  hdr.innerHTML = '<span><i class="fa-solid fa-plug" style="margin-right:6px;color:#a855f7"></i>Select VST Instrument</span>'
+  hdr.style.cssText = `padding:10px 14px;border-bottom:1px solid var(--win-border-in);font-size:12px;font-weight:700;color:var(--text-primary);display:flex;justify-content:space-between;align-items:center;`
+  hdr.innerHTML = '<span><i class="fa-solid fa-plug" style="margin-right:6px;color:var(--color-active)"></i>Select VST Instrument</span>'
 
   const closeBtn = document.createElement('button')
   closeBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>'
-  closeBtn.style.cssText = `background:none;border:none;color:#888;cursor:pointer;font-size:14px;`
+  closeBtn.style.cssText = `background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:14px;`
   closeBtn.onclick = () => { document.body.removeChild(overlay); onPick(null) }
   hdr.appendChild(closeBtn)
 
   const filter = document.createElement('input')
   filter.placeholder = 'Filter…'
-  filter.style.cssText = `margin:8px;padding:5px 8px;background:#111;border:1px solid #333;border-radius:4px;color:#e0e0e0;font-size:11px;outline:none;`
+  filter.style.cssText = `margin:8px;padding:5px 8px;background:var(--surface2);border:1px solid var(--win-border);border-radius:4px;color:var(--text-primary);font-size:11px;outline:none;`
 
   const list = document.createElement('div')
   list.style.cssText = `flex:1;overflow-y:auto;padding:4px 0;`
@@ -246,9 +247,9 @@ function showVstPicker(vsts, onPick) {
     const q = query.toLowerCase()
     vsts.filter(v => v.name.toLowerCase().includes(q)).forEach(v => {
       const item = document.createElement('div')
-      item.style.cssText = `padding:6px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:11px;color:#ccc;`
-      item.innerHTML = `<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#2a2a2a;color:#888;text-transform:uppercase;">${v.format}</span><span>${v.name}</span>`
-      item.onmouseenter = () => item.style.background = '#242424'
+      item.style.cssText = `padding:6px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-primary);`
+      item.innerHTML = `<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:var(--surface2);color:var(--text-secondary);text-transform:uppercase;">${v.format}</span><span>${v.name}</span>`
+      item.onmouseenter = () => item.style.background = 'var(--hover)'
       item.onmouseleave = () => item.style.background = ''
       item.onclick = () => { document.body.removeChild(overlay); onPick(v) }
       list.appendChild(item)
@@ -261,9 +262,9 @@ function showVstPicker(vsts, onPick) {
   // Browse for any plugin file (e.g. a 32-bit VST outside the scanned folders)
   const browseBtn = document.createElement('button')
   browseBtn.innerHTML = `<i class="fa-solid fa-folder-open" style="margin-right:6px;"></i>${t('pia_browse')}`
-  browseBtn.style.cssText = `margin:8px;padding:7px 8px;background:#222;border:1px solid #3a3a3a;border-radius:4px;color:#ccc;font-size:11px;cursor:pointer;`
-  browseBtn.onmouseenter = () => browseBtn.style.background = '#2c2c2c'
-  browseBtn.onmouseleave = () => browseBtn.style.background = '#222'
+  browseBtn.style.cssText = `margin:8px;padding:7px 8px;background:var(--surface2);border:1px solid var(--win-border);border-radius:4px;color:var(--text-primary);font-size:11px;cursor:pointer;`
+  browseBtn.onmouseenter = () => browseBtn.style.background = 'color-mix(in srgb, var(--surface2), var(--text-primary) 10%)'
+  browseBtn.onmouseleave = () => browseBtn.style.background = 'var(--surface2)'
   browseBtn.onclick = async () => {
     try {
       const v = await window.__TAURI__.core.invoke('pick_vst_file')
@@ -936,17 +937,19 @@ export function initPiano(body) {
   function drawRollGrid(w, h) {
     const ctx = gridCanvas.getContext('2d')
     ctx.clearRect(0, 0, w, h)
+    // Theme text colour at alpha a (#rrggbbaa)
+    const ink = a => themeColor('--text-primary') + Math.round(a * 255).toString(16).padStart(2, '0')
     // pitch rows
     for (let p = ROLL_LO; p <= ROLL_HI; p++) {
       const y = (ROLL_HI - p) * rowH
-      if (BLACK_SET.has(p % 12)) { ctx.fillStyle = 'rgba(255,255,255,0.03)'; ctx.fillRect(0, y, w, rowH) }
-      ctx.fillStyle = (p % 12 === 0) ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.05)'
+      if (BLACK_SET.has(p % 12)) { ctx.fillStyle = ink(0.03); ctx.fillRect(0, y, w, rowH) }
+      ctx.fillStyle = (p % 12 === 0) ? ink(0.14) : ink(0.05)
       ctx.fillRect(0, y, w, 1)
     }
     // beat / bar lines
     const ppb = pxPerBeat
     for (let x = 0, b = 0; x <= w; x += ppb, b++) {
-      ctx.fillStyle = (b % 4 === 0) ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.06)'
+      ctx.fillStyle = (b % 4 === 0) ? ink(0.16) : ink(0.06)
       ctx.fillRect(x, 0, 1, h)
     }
   }
@@ -1027,6 +1030,10 @@ export function initPiano(body) {
     if (rollOpen) renderRoll()
     else rebuildKb()
   })
+
+  // Repaint the roll grid (canvas) when the theme changes.
+  const onThemeChanged = () => { if (rollOpen) renderRoll() }
+  window.addEventListener('iceample-theme-changed', onThemeChanged)
 
   function midiNote(oct, semi) { return (oct + 1) * 12 + semi }
 
@@ -1185,6 +1192,7 @@ export function initPiano(body) {
       document.removeEventListener('keydown', onKeyDown)
       document.removeEventListener('keyup',   onKeyUp)
       window.removeEventListener('iceample-midi', onMidiMessage)
+      window.removeEventListener('iceample-theme-changed', onThemeChanged)
       stopPlayback()
       ro.disconnect()
       // Free the VST / kill the 32-bit bridge whenever one was loaded — not only

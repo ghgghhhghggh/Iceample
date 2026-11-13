@@ -19,11 +19,11 @@ function injectExportStyles() {
 .ec-inp:focus{border-color:var(--color-active)}
 .ec-note{font-size:10px;color:var(--text-secondary);opacity:.75;line-height:1.5}
 .ec-progress{height:4px;background:var(--win-border-in);border-radius:2px;overflow:hidden;display:none}
-.ec-bar{height:100%;background:var(--color-active);width:0%;transition:width .1s linear;border-radius:2px}
+.ec-bar{height:100%;background:var(--slider-color);width:0%;transition:width .1s linear;border-radius:2px}
 .ec-actions{display:flex;gap:6px;margin-top:2px}
 .ec-btn{flex:1;padding:8px;border:1px solid var(--win-border-in);border-radius:6px;background:color-mix(in srgb,var(--text-primary) 7%,var(--surface));color:var(--text-secondary);font-size:11px;cursor:pointer;font-family:inherit;transition:all .1s}
 .ec-btn:hover{color:var(--text-primary)}
-.ec-btn.primary{background:var(--color-active);border-color:var(--color-active);color:#fff;font-weight:600}
+.ec-btn.primary{background:var(--btn-primary);border-color:var(--btn-primary);color:var(--on-accent);font-weight:600}
 .ec-btn.primary:hover{opacity:.88}
 .ec-btn:disabled{opacity:.4;pointer-events:none}
 .ec-status{font-size:11px;color:var(--color-active);text-align:center;min-height:16px}

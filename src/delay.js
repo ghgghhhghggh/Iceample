@@ -5,14 +5,14 @@ function injectStyles() {
   const s = document.createElement('style'); s.id = 'delay-styles'
   s.textContent = `
 .dly-body{display:flex;flex-direction:column;height:100%;background:var(--surface);color:var(--text-primary);font-family:inherit;font-size:12px;user-select:none}
-.dly-vis{flex:0 0 90px;background:color-mix(in srgb,var(--surface) 55%,#000);position:relative;overflow:hidden}
+.dly-vis{flex:0 0 90px;background:var(--preview-bg);position:relative;overflow:hidden}
 .dly-vis canvas{position:absolute;inset:0;width:100%;height:100%}
 .dly-ctrl{flex:1;display:flex;flex-direction:column;gap:0;overflow-y:auto}
 .dly-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--win-border-in)}
 .dly-lbl{width:80px;flex-shrink:0;font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px}
 .dly-val{width:48px;flex-shrink:0;font-size:11px;color:var(--color-active);text-align:right;font-variant-numeric:tabular-nums}
 .dly-slider{flex:1;-webkit-appearance:none;appearance:none;height:3px;background:var(--win-border-in);border-radius:2px;outline:none;cursor:pointer}
-.dly-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--color-active);cursor:pointer;border:2px solid var(--surface);box-shadow:0 0 6px color-mix(in srgb,var(--color-active) 60%,transparent)}
+.dly-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--slider-color);cursor:pointer;border:2px solid var(--surface);box-shadow:0 0 6px color-mix(in srgb,var(--color-active) 60%,transparent)}
 .dly-bottom{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--win-border-in);flex-shrink:0}
 .dly-on-btn{flex:1;padding:8px;border-radius:8px;border:1px solid var(--win-border);background:color-mix(in srgb,var(--text-primary) 7%,var(--surface));color:var(--text-secondary);font-size:11px;cursor:pointer;font-family:inherit;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:6px}
 .dly-on-btn.active{background:color-mix(in srgb,var(--color-active) 18%,transparent);border-color:var(--color-active);color:var(--color-active)}

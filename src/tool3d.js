@@ -11,6 +11,7 @@ import { promptName } from './rename-dialog.js'
 import { createElasticSlider, asciiCanvas } from './rb-effects.js'
 import { BUILTIN_PRESETS, getUserPresets, addUserPreset, deleteUserPreset, renameUserPreset } from './material-presets.js'
 import { showSendMenu } from './media-bus.js'
+import { themeColor } from './theme.js'
 
 const LS_KEY = 'iceample:tool3d'
 const DEF_COLOR = '#8a8f9c'
@@ -27,14 +28,14 @@ function injectStyles() {
   background:color-mix(in srgb,var(--text-primary) 7%,var(--surface)); color:var(--text-secondary,#aaa); border-radius:6px; font-family:inherit; font-size:11px; cursor:pointer; }
 .t3-btn:hover { background:color-mix(in srgb,var(--text-primary) 13%,var(--surface)); color:var(--text-primary,#fff); }
 .t3-btn.on { background:color-mix(in srgb, var(--color-active,#4a9eff) 18%, transparent); color:var(--color-active,#4a9eff); border-color:var(--color-active,#4a9eff); }
-.t3-btn.danger:hover { color:#ff6a6a; border-color:#7a2020; }
+.t3-btn.danger:hover { color:var(--danger); border-color:color-mix(in srgb,var(--danger) 45%,transparent); }
 .t3-sel { height:28px; background:color-mix(in srgb,var(--text-primary) 7%,var(--surface)); border:1px solid var(--win-border,#2a2a2a); border-radius:6px; color:var(--text-primary,#eee); font-family:inherit; font-size:11px; padding:0 6px; }
 .t3-sep { width:1px; height:20px; background:var(--win-border-in,#1e1e1e); }
 .t3-view { flex:1; display:flex; min-height:0; }
 .t3-canvas { flex:1; position:relative; overflow:hidden; min-width:0; }
 .t3-canvas canvas { display:block; width:100%; height:100%; }
 .t3-msg { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--text-secondary,#666); font-size:12px; }
-.t3-insp { width:240px; flex-shrink:0; overflow-y:auto; background:color-mix(in srgb,var(--surface) 75%,#000); border-left:1px solid var(--win-border-in,#1e1e1e); padding:10px 11px; }
+.t3-insp { width:240px; flex-shrink:0; overflow-y:auto; background:var(--surface2); border-left:1px solid var(--win-border-in,#1e1e1e); padding:10px 11px; }
 .t3-insp-title { font-size:12px; font-weight:700; color:var(--text-primary,#fff); margin:0 0 10px; display:flex; align-items:center; gap:7px; }
 .t3-insp-title i { color:var(--color-active,#4a9eff); }
 .t3-empty { color:var(--text-secondary,#5f6068); font-size:12px; text-align:center; padding:26px 8px; line-height:1.5; }
@@ -42,13 +43,13 @@ function injectStyles() {
 .t3-sec-h { font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--text-secondary,#7d7f88); margin:0 0 7px; }
 .t3-field { display:flex; align-items:center; gap:7px; margin-bottom:6px; }
 .t3-field > label { font-size:11px; color:var(--text-secondary,#9a9aa3); width:58px; flex-shrink:0; }
-.t3-num { width:100%; min-width:0; background:color-mix(in srgb,var(--surface) 70%,#000); border:1px solid var(--win-border,#2a2a2a); border-radius:5px; color:var(--text-primary,#eee); font-family:inherit; font-size:11px; padding:4px 6px; outline:none; }
+.t3-num { width:100%; min-width:0; background:var(--surface2); border:1px solid var(--win-border,#2a2a2a); border-radius:5px; color:var(--text-primary,#eee); font-family:inherit; font-size:11px; padding:4px 6px; outline:none; }
 .t3-num:focus { border-color:var(--color-active,#4a9eff); }
 .t3-xyz { display:flex; gap:4px; flex:1; min-width:0; }
 .t3-rng { flex:1; min-width:0; }
 .t3-rngval { font-size:10px; color:var(--text-secondary,#9a9aa3); width:36px; text-align:right; flex-shrink:0; font-variant-numeric:tabular-nums; }
 .t3-color { width:34px; height:26px; padding:0; border:1px solid var(--win-border,#2a2a2a); border-radius:5px; background:none; cursor:pointer; flex-shrink:0; }
-.t3-tinput { width:100%; box-sizing:border-box; background:color-mix(in srgb,var(--surface) 70%,#000); border:1px solid var(--win-border,#2a2a2a); border-radius:5px; color:var(--text-primary,#fff); font-family:inherit; font-size:12px; padding:6px 8px; outline:none; }
+.t3-tinput { width:100%; box-sizing:border-box; background:var(--surface2); border:1px solid var(--win-border,#2a2a2a); border-radius:5px; color:var(--text-primary,#fff); font-family:inherit; font-size:12px; padding:6px 8px; outline:none; }
 .t3-tinput:focus { border-color:var(--color-active,#4a9eff); }
 .t3-chk { display:flex; align-items:center; gap:7px; cursor:pointer; font-size:11px; color:var(--text-secondary,#9a9aa3); margin-bottom:6px; }
 .t3-mini { display:flex; gap:5px; margin-top:3px; }
@@ -64,7 +65,7 @@ function injectStyles() {
 .t3-chip .nm { cursor:pointer; }
 .t3-chip .mini { opacity:.45; font-size:9px; cursor:pointer; }
 .t3-chip .mini:hover { opacity:1; }
-.t3-chip .mini.x:hover { color:#ff6a6a; }
+.t3-chip .mini.x:hover { color:var(--danger); }
 .t3-objlist { margin-bottom:12px; max-height:150px; overflow-y:auto; border:1px solid var(--win-border-in,#1e1e1e); border-radius:7px; padding:4px; }
 .t3-obj { display:flex; align-items:center; gap:7px; padding:5px 7px; border-radius:5px; cursor:default; font-size:11px; color:var(--text-secondary,#9a9aa3); }
 .t3-obj:hover { background:color-mix(in srgb,var(--text-primary) 8%,var(--surface)); }
@@ -73,11 +74,11 @@ function injectStyles() {
 .t3-obj .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
 .t3-obj .act { opacity:.45; cursor:pointer; font-size:11px; }
 .t3-obj .act:hover { opacity:1; }
-.t3-obj .act.del:hover { color:#ff6a6a; }
+.t3-obj .act.del:hover { color:var(--danger); }
 .t3-objempty { font-size:11px; color:var(--text-secondary,#5f6068); text-align:center; padding:12px 6px; }
 .t3-hint { position:absolute; left:10px; bottom:9px; z-index:2; font-size:10px; color:var(--text-secondary,#9296a0); line-height:1.55; max-width:250px;
   display:flex; gap:7px; align-items:flex-start; cursor:pointer;
-  background:rgba(0,0,0,0.42); border:1px solid var(--win-border-in,#222); border-radius:6px; padding:5px 9px; backdrop-filter:blur(3px); }
+  background:color-mix(in srgb,var(--surface2) 75%,transparent); border:1px solid var(--win-border-in,#222); border-radius:6px; padding:5px 9px; backdrop-filter:blur(3px); }
 .t3-hint-i { color:var(--color-active,#4a9eff); margin-top:1px; flex-shrink:0; }
 .t3-hint.collapsed .t3-hint-t { display:none; }
 .t3-hint.collapsed { padding:5px 7px; }
@@ -202,8 +203,10 @@ export async function initTool3D(body) {
   hint.addEventListener('click', () => { const c = hint.classList.toggle('collapsed'); try { localStorage.setItem('iceample:tool3d:hint', c ? 'off' : 'on') } catch {} })
   canvasBox.appendChild(hint)
   const scene = new THREE.Scene()
-  const themeBg = getComputedStyle(document.documentElement).getPropertyValue('--workbench-bg').trim() || '#0b0c11'
-  scene.background = new THREE.Color(themeBg)
+  const sceneBg = new THREE.Color(themeColor('--preview-bg'))
+  scene.background = sceneBg
+  const onThemeChange = () => sceneBg.set(themeColor('--preview-bg'))
+  window.addEventListener('iceample-theme-changed', onThemeChange)
   const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 200); camera.position.set(3, 2.4, 4)
   // Procedural studio environment (soft vertical gradient + softbox strips) so
   // metallic materials (chrome / gold) reflect something instead of going black.
@@ -624,7 +627,7 @@ export async function initTool3D(body) {
     if (!withPal) return field(label, c)
     const wrap = el('div'); wrap.style.cssText = 'display:flex;gap:4px;align-items:center;flex:1'
     const pb = el('button'); pb.innerHTML = '<i class="fa-solid fa-palette" style="font-size:10px"></i>'
-    pb.style.cssText = 'width:22px;height:22px;border-radius:4px;border:1px solid var(--win-border,#2a2a2a);background:#1c1c20;color:#aaa;cursor:pointer;padding:0;flex-shrink:0'
+    pb.style.cssText = 'width:22px;height:22px;border-radius:4px;border:1px solid var(--win-border,#2a2a2a);background:var(--surface2);color:var(--text-secondary);cursor:pointer;padding:0;flex-shrink:0'
     pb.addEventListener('click', () => showPalPicker(pb, v => { c.value = v; on(v) }))
     wrap.append(c, pb); return field(label, wrap)
   }
@@ -1065,6 +1068,7 @@ export async function initTool3D(body) {
     if (!document.contains(body)) {
       alive = false; cancelAnimationFrame(raf); ro.disconnect()
       document.removeEventListener('keydown', onKey); document.removeEventListener('keyup', onKeyUp); window.removeEventListener('blur', clearFly)
+      window.removeEventListener('iceample-theme-changed', onThemeChange)
       const disposeMat = mt => { if (!mt) return; [mt.map, mt.alphaMap, mt.normalMap, mt.emissiveMap].forEach(tx => tx?.dispose?.()); mt.dispose?.() }
       objects.forEach(({ mesh }) => mesh.traverse(n => {
         if (!n.isMesh) return

@@ -79,7 +79,7 @@ function injectStyles() {
 .tuner-wrap {
   display: flex; flex-direction: column; align-items: center;
   height: 100%; gap: 10px; padding: 14px;
-  overflow-y: auto; scrollbar-width: thin; scrollbar-color: #333 transparent;
+  overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--win-border) transparent;
 }
 .tuner-note-display {
   display: flex; align-items: baseline; gap: 4px;
@@ -112,25 +112,25 @@ function injectStyles() {
   color: var(--dim);
 }
 .tuner-source-btn {
-  font-size: 10px; background: #1a1a1a; border: 1px solid var(--win-border);
+  font-size: 10px; background: var(--surface2); border: 1px solid var(--win-border);
   border-radius: 4px; color: var(--text-secondary); padding: 4px 10px;
   font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 6px;
 }
-.tuner-source-btn:hover { background: #242424; color: var(--text-primary); }
+.tuner-source-btn:hover { background: color-mix(in srgb, var(--surface2), var(--text-primary) 10%); color: var(--text-primary); }
 .tuner-divider {
-  width: 100%; border: none; border-top: 1px solid rgba(255,255,255,0.06);
+  width: 100%; border: none; border-top: 1px solid color-mix(in srgb, var(--text-primary) 6%, transparent);
   margin: 4px 0;
 }
 .tuner-section-hdr {
   font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
-  text-transform: uppercase; color: rgba(255,255,255,0.25);
+  text-transform: uppercase; color: color-mix(in srgb, var(--text-primary) 25%, transparent);
   padding-bottom: 4px; align-self: flex-start; width: 100%;
 }
 .tuner-bpm-row {
   display: flex; align-items: center; gap: 8px; width: 100%;
 }
 .tuner-bpm-inp {
-  width: 64px; background: #161616; border: 1px solid var(--win-border);
+  width: 64px; background: var(--surface2); border: 1px solid var(--win-border);
   border-radius: 5px; color: var(--text-primary); font-size: 18px;
   font-family: inherit; font-weight: 700; text-align: center;
   padding: 3px 0; outline: none;
@@ -146,11 +146,11 @@ function injectStyles() {
   letter-spacing: 0.08em; color: var(--dim); padding: 3px 6px;
 }
 .delay-cell {
-  font-size: 11px; padding: 4px 6px; background: #111;
+  font-size: 11px; padding: 4px 6px; background: var(--surface2);
   border-radius: 3px; color: var(--text-secondary); font-variant-numeric: tabular-nums;
 }
 .delay-cell:first-child { color: var(--text-primary); font-weight: 600; }
-.delay-cell.hz { color: #555; font-size: 10px; }
+.delay-cell.hz { color: color-mix(in srgb, var(--text-secondary) 65%, transparent); font-size: 10px; }
 `
   document.head.appendChild(s)
 }
@@ -195,7 +195,7 @@ export function initTuner(body) {
   const ax2 = CX + R * Math.cos(Math.PI - endA),   ay2 = CY - R * Math.sin(Math.PI - endA)
   arc.setAttribute('d', `M ${ax1} ${ay1} A ${R} ${R} 0 0 1 ${ax2} ${ay2}`)
   arc.setAttribute('fill', 'none')
-  arc.setAttribute('stroke', '#222')
+  arc.style.stroke = 'var(--win-border)'   // style, not attribute: var() support
   arc.setAttribute('stroke-width', '3')
   arc.setAttribute('stroke-linecap', 'round')
   svg.appendChild(arc)
@@ -204,14 +204,14 @@ export function initTuner(body) {
   const cMark = document.createElementNS('http://www.w3.org/2000/svg', 'line')
   cMark.setAttribute('x1', CX); cMark.setAttribute('y1', CY - R + 6)
   cMark.setAttribute('x2', CX); cMark.setAttribute('y2', CY - R + 16)
-  cMark.setAttribute('stroke', '#444'); cMark.setAttribute('stroke-width', '2')
+  cMark.style.stroke = 'color-mix(in srgb, var(--text-secondary) 65%, transparent)'; cMark.setAttribute('stroke-width', '2')
   svg.appendChild(cMark)
 
   // Needle
   const needle = document.createElementNS('http://www.w3.org/2000/svg', 'line')
   needle.setAttribute('x1', CX); needle.setAttribute('y1', CY)
   needle.setAttribute('x2', CX); needle.setAttribute('y2', CY - R + 4)
-  needle.setAttribute('stroke', '#666'); needle.setAttribute('stroke-width', '2')
+  needle.style.stroke = 'var(--text-secondary)'; needle.setAttribute('stroke-width', '2')
   needle.setAttribute('stroke-linecap', 'round')
   svg.appendChild(needle)
 
@@ -224,7 +224,7 @@ export function initTuner(body) {
     const nx = CX + (R - 4) * Math.cos(Math.PI - needleAngle)
     const ny = CY - (R - 4) * Math.sin(Math.PI - needleAngle)
     needle.setAttribute('x2', nx); needle.setAttribute('y2', ny)
-    needle.setAttribute('stroke', color)
+    needle.style.stroke = color
   }
 
   const centsEl = document.createElement('div')
@@ -264,9 +264,9 @@ export function initTuner(body) {
       centsEl.textContent = (cents >= 0 ? '+' : '') + cents + ' ¢'
 
       const absCents = Math.abs(cents)
-      const color = absCents < 5 ? '#20be3c' : absCents < 15 ? '#d2c314' : '#dc281e'
+      const color = absCents < 5 ? 'var(--success)' : absCents < 15 ? 'var(--warning)' : 'var(--danger)'
       noteEl.style.color = color
-      needle.setAttribute('stroke', color)
+      needle.style.stroke = color
       setNeedle(cents, color)
 
       statusEl.textContent = absCents < 5 ? t('tuner_in_tune') : absCents < 15 ? t('tuner_close') : t('tuner_out_of_tune')
@@ -287,7 +287,7 @@ export function initTuner(body) {
       srcBtn.innerHTML = `<i class="fa-solid fa-microphone"></i> ${t('tuner_enable_mic')}`
       noteEl.textContent = '—'; octEl.textContent = ''; freqEl.textContent = '— Hz'
       centsEl.textContent = '— ¢'; statusEl.textContent = t('tuner_waiting')
-      noteEl.style.color = ''; setNeedle(0, '#666')
+      noteEl.style.color = ''; setNeedle(0, 'var(--text-secondary)')
       return
     }
     try {

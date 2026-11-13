@@ -53,8 +53,8 @@ function injectStyles() {
 .ta-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 8px;border:1px solid var(--win-border-in);border-radius:7px;background:color-mix(in srgb,var(--text-primary) 6%,var(--surface));color:var(--text-secondary);font-size:11px;cursor:pointer;font-family:inherit;transition:all .12s;white-space:nowrap}
 .ta-btn:hover{background:color-mix(in srgb,var(--text-primary) 12%,var(--surface));color:var(--text-primary)}
 .ta-btn:disabled{opacity:.45;pointer-events:none}
-.ta-btn.primary{border-color:var(--color-active);background:color-mix(in srgb,var(--color-active) 16%,transparent);color:var(--color-active)}
-.ta-btn.primary:hover{background:color-mix(in srgb,var(--color-active) 26%,transparent)}
+.ta-btn.primary{border-color:var(--btn-primary);background:color-mix(in srgb,var(--btn-primary) 16%,transparent);color:var(--btn-primary)}
+.ta-btn.primary:hover{background:color-mix(in srgb,var(--btn-primary) 26%,transparent)}
 .ta-toggle{width:34px;height:18px;border-radius:9px;border:none;cursor:pointer;position:relative;transition:background .15s;justify-self:start}
 .ta-toggle.off{background:var(--win-border-in)}
 .ta-toggle.on{background:var(--color-active)}

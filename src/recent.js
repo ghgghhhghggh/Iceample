@@ -75,7 +75,7 @@ export function initRecent(body) {
   const clearBtn = document.createElement('button')
   clearBtn.innerHTML = '<i class="fa-solid fa-trash"></i>'
   clearBtn.title = 'Effacer l\'historique'
-  clearBtn.style.cssText = 'background:none;border:1px solid var(--win-border-in,#1e1e1e);color:#888;padding:5px 8px;border-radius:5px;cursor:pointer;font-size:11px;'
+  clearBtn.style.cssText = 'background:none;border:1px solid var(--win-border-in,#1e1e1e);color:var(--text-secondary);padding:5px 8px;border-radius:5px;cursor:pointer;font-size:11px;'
   clearBtn.addEventListener('click', () => {
     if (confirm('Effacer tout l\'historique ?')) {
       saveEntries([])
@@ -100,7 +100,7 @@ export function initRecent(body) {
     list.innerHTML = ''
     if (!entries.length) {
       const empty = document.createElement('div')
-      empty.style.cssText = 'text-align:center;color:#555;font-size:12px;padding:40px 16px;'
+      empty.style.cssText = 'text-align:center;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);font-size:12px;padding:40px 16px;'
       empty.textContent = q ? 'Aucun résultat' : 'Aucun fichier récent'
       list.appendChild(empty)
       return
@@ -110,32 +110,32 @@ export function initRecent(body) {
       const icon = TYPE_ICONS[entry.ext] || 'fa-solid fa-file'
       const row = document.createElement('div')
       row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;cursor:pointer;transition:background 0.1s;margin-bottom:2px;'
-      row.addEventListener('mouseenter', () => row.style.background = 'rgba(255,255,255,0.05)')
+      row.addEventListener('mouseenter', () => row.style.background = 'color-mix(in srgb, var(--text-primary) 5%, transparent)')
       row.addEventListener('mouseleave', () => row.style.background = '')
 
       const ico = document.createElement('i')
       ico.className = icon
-      ico.style.cssText = 'font-size:16px;color:#778;width:18px;text-align:center;flex-shrink:0;'
+      ico.style.cssText = 'font-size:16px;color:var(--text-secondary);width:18px;text-align:center;flex-shrink:0;'
 
       const info = document.createElement('div')
       info.style.cssText = 'flex:1;min-width:0;'
       info.innerHTML = `
         <div style="font-size:12px;color:var(--text-primary,#ddd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${entry.name}</div>
-        <div style="font-size:10px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${entry.path}">${entry.path}</div>
+        <div style="font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${entry.path}">${entry.path}</div>
       `
 
       const meta = document.createElement('div')
       meta.style.cssText = 'display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;'
       meta.innerHTML = `
-        <span style="font-size:10px;color:#555;">${relativeTime(entry.opened_at)}</span>
+        <span style="font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);">${relativeTime(entry.opened_at)}</span>
         <div style="display:flex;gap:4px;">
-          <button title="Ouvrir" style="background:none;border:1px solid #333;color:#888;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:10px;">
+          <button title="Ouvrir" style="background:none;border:1px solid var(--win-border);color:var(--text-secondary);padding:2px 6px;border-radius:4px;cursor:pointer;font-size:10px;">
             <i class="fa-solid fa-arrow-up-right-from-square"></i>
           </button>
-          <button title="Ouvrir dans l\'explorateur" style="background:none;border:1px solid #333;color:#888;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:10px;">
+          <button title="Ouvrir dans l\'explorateur" style="background:none;border:1px solid var(--win-border);color:var(--text-secondary);padding:2px 6px;border-radius:4px;cursor:pointer;font-size:10px;">
             <i class="fa-solid fa-folder-open"></i>
           </button>
-          <button title="Supprimer de l\'historique" style="background:none;border:1px solid #333;color:#888;padding:2px 6px;border-radius:4px;cursor:pointer;font-size:10px;">
+          <button title="Supprimer de l\'historique" style="background:none;border:1px solid var(--win-border);color:var(--text-secondary);padding:2px 6px;border-radius:4px;cursor:pointer;font-size:10px;">
             <i class="fa-solid fa-xmark"></i>
           </button>
         </div>

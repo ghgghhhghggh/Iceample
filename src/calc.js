@@ -15,9 +15,9 @@ function injectStyles() {
 .calc-key:active{background:color-mix(in srgb,var(--text-primary) 18%,var(--surface))}
 .calc-key.op{color:var(--color-active)}
 .calc-key.fn{color:var(--text-secondary);font-size:13px}
-.calc-key.eq{background:var(--color-active);color:#fff}
-.calc-key.eq:hover{background:color-mix(in srgb,var(--color-active) 85%,#fff)}
-.calc-key.eq:active{background:color-mix(in srgb,var(--color-active) 70%,#fff)}
+.calc-key.eq{background:var(--btn-primary);color:var(--on-accent)}
+.calc-key.eq:hover{background:color-mix(in srgb,var(--btn-primary) 85%,#fff)}
+.calc-key.eq:active{background:color-mix(in srgb,var(--btn-primary) 70%,#fff)}
 .calc-key.zero{grid-column:span 2}
 `
   document.head.appendChild(s)

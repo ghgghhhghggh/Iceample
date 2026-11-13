@@ -1,6 +1,10 @@
 // eq.js — 10-band graphic equalizer for Iceample v2
 import { initEqForTarget, setEqGainForTarget, getEqBandsForTarget } from './audio-bus.js'
 import { t } from './i18n.js'
+import { themeColor } from './theme.js'
+
+// '#rrggbb' + alpha → '#rrggbbaa' (canvas colours from themeColor)
+const withAlpha = (hex, a) => hex + Math.round(a * 255).toString(16).padStart(2, '0')
 
 const EQ_LABELS = ['32','64','125','250','500','1k','2k','4k','8k','16k']
 const DB_RANGE  = 12
@@ -47,20 +51,20 @@ function injectStyles() {
 }
 .eq-target-btn {
   flex: 1; height: 22px; border-radius: 4px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  color: rgba(255,255,255,0.35); font-size: 10px; font-weight: 600;
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: color-mix(in srgb, var(--text-primary) 35%, transparent); font-size: 10px; font-weight: 600;
   cursor: pointer; transition: all 0.13s; font-family: inherit;
   letter-spacing: 0.04em; white-space: nowrap; overflow: hidden;
   text-overflow: ellipsis;
 }
 .eq-target-btn:hover {
-  background: rgba(255,255,255,0.09); color: rgba(255,255,255,0.75);
+  background: color-mix(in srgb, var(--text-primary) 9%, transparent); color: color-mix(in srgb, var(--text-primary) 75%, transparent);
 }
 .eq-target-btn.active {
-  background: rgba(255,255,255,0.12);
-  border-color: rgba(255,255,255,0.3);
-  color: #fff;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  border-color: color-mix(in srgb, var(--text-primary) 30%, transparent);
+  color: var(--text-primary);
 }
 .eq-canvas-wrap {
   flex: 1; min-height: 0; position: relative;
@@ -88,7 +92,7 @@ function injectStyles() {
   writing-mode: vertical-lr; direction: rtl;
   -webkit-appearance: slider-vertical; appearance: slider-vertical;
   width: 18px; height: 88px;
-  accent-color: var(--color-active); cursor: pointer;
+  accent-color: var(--slider-color); cursor: pointer;
   background: transparent; outline: none;
 }
 .eq-freq-label {
@@ -102,11 +106,11 @@ function injectStyles() {
 }
 .eq-reset-btn {
   height: 22px; padding: 0 10px; border-radius: 4px;
-  background: #1a1a1a; border: 1px solid var(--win-border);
+  background: var(--surface2); border: 1px solid var(--win-border);
   color: var(--text-secondary); font-size: 10px; font-weight: 600;
   letter-spacing: 0.05em; cursor: pointer; font-family: inherit;
 }
-.eq-reset-btn:hover { background: #242424; color: var(--text-primary); }
+.eq-reset-btn:hover { background: color-mix(in srgb, var(--surface2), var(--text-primary) 10%); color: var(--text-primary); }
 .eq-range-label {
   font-size: 9px; color: var(--dim); margin-left: auto;
 }
@@ -176,26 +180,27 @@ export function initEq(body) {
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0, 0, W, H)
 
-    ctx.fillStyle = '#0e0e0e'
+    ctx.fillStyle = themeColor('--surface2')
     ctx.fillRect(0, 0, W, H)
 
     const toX = f => Math.round((Math.log10(f / 20) / Math.log10(1000)) * (W - 1))
     const toY = db => Math.round(H / 2 - (db / DB_RANGE) * (H / 2 - 8))
 
     // Grid
-    ctx.strokeStyle = '#1e1e1e'; ctx.lineWidth = 1
+    const gridCol = themeColor('--win-border-in')
+    ctx.strokeStyle = gridCol; ctx.lineWidth = 1
     const dbLines = [-12, -6, 0, 6, 12]
     dbLines.forEach(db => {
       const y = toY(db)
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y)
-      ctx.strokeStyle = db === 0 ? '#333' : '#1e1e1e'
+      ctx.strokeStyle = db === 0 ? themeColor('--win-border') : gridCol
       ctx.stroke()
     })
     EQ_LABELS.forEach((_, i) => {
       const freq = [32,64,125,250,500,1000,2000,4000,8000,16000][i]
       const x = toX(freq)
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H)
-      ctx.strokeStyle = '#1a1a1a'; ctx.stroke()
+      ctx.strokeStyle = gridCol; ctx.stroke()
     })
 
     // Curve
@@ -210,10 +215,11 @@ export function initEq(body) {
     })
     const dbArr = combined.map(m => 20 * Math.log10(Math.max(m, 1e-6)))
 
+    const accent = themeColor('--color-active')
     const grad = ctx.createLinearGradient(0, 0, 0, H)
-    grad.addColorStop(0, 'rgba(74,158,255,0.25)')
-    grad.addColorStop(0.5, 'rgba(74,158,255,0.08)')
-    grad.addColorStop(1, 'rgba(74,158,255,0.01)')
+    grad.addColorStop(0, withAlpha(accent, 0.25))
+    grad.addColorStop(0.5, withAlpha(accent, 0.08))
+    grad.addColorStop(1, withAlpha(accent, 0.01))
     ctx.beginPath()
     ctx.moveTo(0, toY(0))
     for (let i = 0; i < N_CURVE; i++) {
@@ -228,15 +234,16 @@ export function initEq(body) {
     for (let i = 0; i < N_CURVE; i++) {
       ctx.lineTo(toX(CURVE_FREQS[i]), toY(Math.max(-DB_RANGE, Math.min(DB_RANGE, dbArr[i]))))
     }
-    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--color-active').trim() || '#4a9eff'
+    ctx.strokeStyle = accent
     ctx.lineWidth = 1.5; ctx.stroke()
 
-    ctx.fillStyle = '#444'; ctx.font = '9px monospace'
+    ctx.fillStyle = withAlpha(themeColor('--text-secondary'), 0.65); ctx.font = '9px monospace'
     ctx.fillText('0', 3, toY(0) - 3)
   }
 
   const ro = new ResizeObserver(drawCurve)
   ro.observe(canvasWrap)
+  window.addEventListener('iceample-theme-changed', drawCurve)
 
   // ── Sliders ──────────────────────────────────────────────────────────────────
   const bandsRow = document.createElement('div')
@@ -312,7 +319,7 @@ export function initEq(body) {
   requestAnimationFrame(drawCurve)
 
   const obs = new MutationObserver(() => {
-    if (!document.contains(body)) { ro.disconnect(); obs.disconnect() }
+    if (!document.contains(body)) { ro.disconnect(); window.removeEventListener('iceample-theme-changed', drawCurve); obs.disconnect() }
   })
   obs.observe(document.body, { childList: true, subtree: true })
 }

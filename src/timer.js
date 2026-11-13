@@ -20,7 +20,7 @@ function injectStyles() {
   display: flex; align-items: center; justify-content: center;
 }
 .timer-mode-btn.active {
-  background: color-mix(in srgb, var(--color-active) 18%, #000);
+  background: color-mix(in srgb, var(--color-active) 18%, var(--surface2));
   color: var(--color-active);
 }
 .timer-display {
@@ -29,7 +29,7 @@ function injectStyles() {
   line-height: 1;
 }
 .timer-display.running { color: var(--color-active); }
-.timer-display.finished { color: #dc281e; }
+.timer-display.finished { color: var(--danger); }
 .timer-milliseconds {
   font-size: 20px; font-weight: 600; color: var(--text-secondary);
   font-variant-numeric: tabular-nums; letter-spacing: -1px;
@@ -39,24 +39,24 @@ function injectStyles() {
 }
 .timer-btn {
   width: 44px; height: 34px; border-radius: 6px;
-  background: #1a1a1a; border: 1px solid var(--win-border);
+  background: var(--surface2); border: 1px solid var(--win-border);
   color: var(--text-secondary); font-size: 15px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; transition: all 0.12s;
 }
-.timer-btn:hover { background: #242424; color: var(--text-primary); }
+.timer-btn:hover { background: color-mix(in srgb, var(--surface2), var(--text-primary) 10%); color: var(--text-primary); }
 .timer-btn.primary {
-  background: color-mix(in srgb, var(--color-active) 15%, #000);
+  background: color-mix(in srgb, var(--color-active) 15%, var(--surface2));
   border-color: var(--color-active); color: var(--color-active);
 }
 .timer-btn.primary:hover {
-  background: color-mix(in srgb, var(--color-active) 25%, #000);
+  background: color-mix(in srgb, var(--color-active) 25%, var(--surface2));
 }
 .timer-countdown-setup {
   display: flex; align-items: center; gap: 6px;
 }
 .timer-cd-inp {
-  width: 48px; background: #161616; border: 1px solid var(--win-border);
+  width: 48px; background: var(--surface2); border: 1px solid var(--win-border);
   border-radius: 5px; color: var(--text-primary); font-size: 18px;
   font-family: inherit; font-weight: 700; text-align: center;
   padding: 4px 0; outline: none;

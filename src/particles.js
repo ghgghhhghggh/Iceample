@@ -416,7 +416,7 @@ export function initParticles(body) {
   const ctx = canvas.getContext('2d')
   canvasWrap.appendChild(canvas)
 
-  const CHECKER = 'repeating-conic-gradient(rgba(255,255,255,.13) 0% 25%, rgba(255,255,255,.045) 0% 50%) 0 0 / 16px 16px'
+  const CHECKER = 'repeating-conic-gradient(color-mix(in srgb,var(--text-primary) 13%,transparent) 0% 25%, color-mix(in srgb,var(--text-primary) 4.5%,transparent) 0% 50%) 0 0 / 16px 16px'
   const updateChecker = () => { canvas.style.background = state.transparent ? CHECKER : 'none' }
 
   // ── Click-to-place emitter (pin overlay + reset chip, % positioned) ────────
@@ -508,7 +508,7 @@ export function initParticles(body) {
   const WEBM_LABEL = '<i class="fa-solid fa-video"></i> WebM'
   exportWebmBtn.innerHTML = WEBM_LABEL
   exportWebmBtn.title = t('pt_export_webm')
-  exportWebmBtn.style.cssText = BTN + 'background:var(--color-active);color:#fff;'
+  exportWebmBtn.style.cssText = BTN + 'background:var(--btn-primary);color:var(--on-accent);'
 
   topBar.append(playBtn, resetBtn, countBadge, exportPngBtn, sendBtn, durWrap, exportWebmBtn)
 
@@ -603,7 +603,7 @@ export function initParticles(body) {
 .pt-menu-item{display:flex;align-items:center;gap:7px;padding:6px 9px;border:none;background:none;color:var(--text-secondary);font-size:11px;font-family:inherit;border-radius:5px;cursor:pointer;text-align:left}
 .pt-menu-item i{font-size:9px;width:11px;text-align:center}
 .pt-menu-item:hover{background:color-mix(in srgb,var(--text-primary) 10%,transparent);color:var(--text-primary)}
-.pt-menu-item.danger:hover{color:var(--vu-color-high)}
+.pt-menu-item.danger:hover{color:var(--danger)}
 .pt-star-btn{width:24px;height:20px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--win-border-in);border-radius:5px;background:none;color:var(--text-secondary);cursor:pointer;font-size:9px;transition:all .1s}
 .pt-star-btn:hover{border-color:var(--color-active);color:var(--color-active)}
 `
@@ -839,7 +839,7 @@ export function initParticles(body) {
     row.append(lbl, val)
     const inp = document.createElement('input')
     inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step2; inp.value = state[key]
-    inp.style.cssText = 'width:100%;accent-color:var(--color-active);'
+    inp.style.cssText = 'width:100%;accent-color:var(--slider-color);'
     inp.addEventListener('input', () => {
       state[key] = parseFloat(inp.value)
       val.textContent = fmt(state[key])

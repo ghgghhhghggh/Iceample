@@ -13,14 +13,14 @@ function injectStyles() {
 .player-body { display:flex; align-items:center; justify-content:center; height:100%; background:var(--surface,#141414); padding:0 12px; }
 .player-row { display:flex; align-items:center; gap:9px; width:100%; }
 .player-bpm { min-width:46px; text-align:center; font-size:18px; font-weight:700; color:var(--text-primary,#fff);
-  background:#0e0e10; border:1px solid var(--win-border,#2a2a2a); border-radius:7px; padding:5px 9px; cursor:ns-resize;
+  background:var(--surface2); border:1px solid var(--win-border,#2a2a2a); border-radius:7px; padding:5px 9px; cursor:ns-resize;
   outline:none; font-variant-numeric:tabular-nums; user-select:none; }
 .player-bpm:focus { border-color:var(--color-active,#4a9eff); }
 .player-bpm-lbl { font-size:9px; font-weight:700; letter-spacing:0.12em; color:var(--text-secondary,#888); }
 .player-sep { width:1px; height:24px; background:var(--win-border-in,#1e1e1e); }
 .player-btn { width:38px; height:32px; display:flex; align-items:center; justify-content:center; border:1px solid var(--win-border,#2a2a2a);
-  background:#1c1c20; color:var(--text-primary,#eee); border-radius:7px; cursor:pointer; font-size:13px; transition:background .1s,color .1s,border-color .1s; }
-.player-btn:hover { background:#26262c; }
+  background:var(--surface2); color:var(--text-primary,#eee); border-radius:7px; cursor:pointer; font-size:13px; transition:background .1s,color .1s,border-color .1s; }
+.player-btn:hover { background:color-mix(in srgb, var(--surface2), var(--text-primary) 10%); }
 .player-btn.active { color:var(--color-active,#4a9eff); border-color:var(--color-active,#4a9eff); }
 .player-time { margin-left:auto; font-size:15px; font-variant-numeric:tabular-nums; color:var(--text-secondary,#bbb); letter-spacing:0.02em; }
   `

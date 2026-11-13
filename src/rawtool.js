@@ -53,7 +53,7 @@ function injectStyles() {
 .rw-field{display:flex;flex-direction:column;gap:3px}
 .rw-field label{font-size:10px;color:var(--text-secondary);display:flex;justify-content:space-between;gap:6px}
 .rw-field .rw-val{opacity:.75;font-variant-numeric:tabular-nums}
-.rw-field input[type=range]{width:100%;accent-color:var(--color-active);margin:0}
+.rw-field input[type=range]{width:100%;accent-color:var(--slider-color);margin:0}
 .rw-field select{width:100%;background:var(--surface2,var(--surface));border:1px solid var(--win-border-in);color:var(--text-primary);border-radius:5px;padding:4px 6px;font-size:11px;font-family:inherit;outline:none}
 .rw-check{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--text-secondary);cursor:pointer}
 .rw-check input{accent-color:var(--color-active);margin:0}

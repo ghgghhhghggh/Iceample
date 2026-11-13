@@ -28,7 +28,7 @@ function injectRbStyles() {
   s.textContent = `
 .rb-es { width:var(--rb-es-w,80px); padding:8px 0; cursor:pointer; transition:transform .14s ease; touch-action:none; }
 .rb-es-track { height:5px; background:#2a2a2e; border-radius:3px; position:relative; }
-.rb-es-fill { height:100%; background:var(--color-active,#4a9eff); border-radius:3px; width:0; }
+.rb-es-fill { height:100%; background:var(--slider-color); border-radius:3px; width:0; }
 .rb-es.grab { transition:none; }
 .rb-es.grab .rb-es-track { box-shadow:0 0 0 3px color-mix(in srgb, var(--color-active,#4a9eff) 22%, transparent); }
 @keyframes rb-list-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }

@@ -35,8 +35,8 @@ function btn(label, primary) {
   const b = document.createElement('button')
   b.innerHTML = label
   b.style.cssText = BTN + (primary
-    ? 'background:var(--color-active,#4a9eff);color:#fff;'
-    : 'background:#2a2a2a;border:1px solid #444;color:#ddd;')
+    ? 'background:var(--color-active,#4a9eff);color:var(--on-accent);'
+    : 'background:var(--surface2);border:1px solid var(--win-border);color:var(--text-primary);')
   return b
 }
 
@@ -47,7 +47,7 @@ function statusEl() {
 }
 function setStatus(el, msg, type) {
   el.textContent = msg
-  el.style.color = type === 'error' ? '#e05252' : type === 'success' ? '#52b152' : type === 'progress' ? '#4a9eff' : '#888'
+  el.style.color = type === 'error' ? 'var(--danger)' : type === 'success' ? 'var(--success)' : type === 'progress' ? 'var(--color-active)' : 'var(--text-secondary)'
 }
 
 function select(opts) {
@@ -63,7 +63,7 @@ function select(opts) {
 function label(text, el) {
   const w = document.createElement('div')
   const l = document.createElement('div')
-  l.style.cssText = 'font-size:10px;color:#888;margin-bottom:3px;'
+  l.style.cssText = 'font-size:10px;color:var(--text-secondary);margin-bottom:3px;'
   l.textContent = text
   w.append(l, el)
   return w
@@ -80,7 +80,7 @@ function hrow(...els) {
 function fileList(accept) {
   const paths = []
   const box = document.createElement('div')
-  box.style.cssText = 'border:1px dashed #333;border-radius:6px;padding:6px;min-height:50px;max-height:180px;overflow-y:auto;'
+  box.style.cssText = 'border:1px dashed var(--win-border);border-radius:6px;padding:6px;min-height:50px;max-height:180px;overflow-y:auto;'
 
   const ICONS = {
     // images
@@ -104,24 +104,24 @@ function fileList(accept) {
     box.innerHTML = ''
     if (!paths.length) {
       const ph = document.createElement('div')
-      ph.style.cssText = 'font-size:11px;color:#555;text-align:center;padding:10px;'
+      ph.style.cssText = 'font-size:11px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);text-align:center;padding:10px;'
       ph.textContent = 'Aucun fichier'
       box.appendChild(ph); return
     }
     paths.forEach((p, i) => {
       const row = document.createElement('div')
       row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;margin-bottom:2px;'
-      row.addEventListener('mouseenter', () => row.style.background = 'rgba(255,255,255,0.04)')
+      row.addEventListener('mouseenter', () => row.style.background = 'color-mix(in srgb, var(--text-primary) 4%, transparent)')
       row.addEventListener('mouseleave', () => row.style.background = '')
       const icon = document.createElement('i')
       icon.className = ICONS[ext(p)] || 'fa-solid fa-file'
-      icon.style.cssText = 'font-size:12px;color:#778;width:14px;text-align:center;'
+      icon.style.cssText = 'font-size:12px;color:var(--text-secondary);width:14px;text-align:center;'
       const name = document.createElement('span')
-      name.style.cssText = 'flex:1;font-size:11px;color:#ccc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+      name.style.cssText = 'flex:1;font-size:11px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
       name.title = p; name.textContent = shortName(p)
       const rm = document.createElement('button')
       rm.innerHTML = '<i class="fa-solid fa-xmark"></i>'
-      rm.style.cssText = 'background:none;border:none;color:#555;cursor:pointer;font-size:10px;padding:2px 4px;'
+      rm.style.cssText = 'background:none;border:none;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);cursor:pointer;font-size:10px;padding:2px 4px;'
       rm.addEventListener('click', () => { paths.splice(i, 1); render() })
       row.append(icon, name, rm)
       box.appendChild(row)
@@ -130,10 +130,10 @@ function fileList(accept) {
   render()
 
   // Drag and drop
-  box.addEventListener('dragover', e => { e.preventDefault(); box.style.borderColor = '#4a9eff' })
-  box.addEventListener('dragleave', () => { box.style.borderColor = '#333' })
+  box.addEventListener('dragover', e => { e.preventDefault(); box.style.borderColor = 'var(--color-active)' })
+  box.addEventListener('dragleave', () => { box.style.borderColor = 'var(--win-border)' })
   box.addEventListener('drop', e => {
-    e.preventDefault(); box.style.borderColor = '#333'
+    e.preventDefault(); box.style.borderColor = 'var(--win-border)'
     for (const f of e.dataTransfer.files) {
       if (f.path && !paths.includes(f.path)) paths.push(f.path)
     }
@@ -158,7 +158,7 @@ function resultList() {
     add(path, ok) {
       items.push({ path, ok })
       const row = document.createElement('div')
-      row.style.cssText = `display:flex;align-items:center;gap:6px;font-size:11px;color:${ok ? '#52b152' : '#e05252'};`
+      row.style.cssText = `display:flex;align-items:center;gap:6px;font-size:11px;color:${ok ? 'var(--success)' : 'var(--danger)'};`
       row.innerHTML = `<i class="${ok ? 'fa-solid fa-check' : 'fa-solid fa-xmark'}"></i>`
       const n = document.createElement('span')
       n.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
@@ -193,7 +193,7 @@ const IMG_FMTS = [
 
 function buildImages(wrap) {
   const note = document.createElement('div')
-  note.style.cssText = 'font-size:11px;color:#888;'
+  note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
   note.textContent = 'Convertissez entre formats d\'image. Glissez-déposez ou ajoutez des fichiers.'
 
   const list = fileList(IMG_EXTS)
@@ -201,9 +201,9 @@ function buildImages(wrap) {
   const fmtSel = select(IMG_FMTS)
   const qualSlider = document.createElement('input')
   qualSlider.type = 'range'; qualSlider.min = '10'; qualSlider.max = '100'; qualSlider.value = '90'
-  qualSlider.style.cssText = 'flex:1;accent-color:var(--color-active,#4a9eff);'
+  qualSlider.style.cssText = 'flex:1;accent-color:var(--slider-color);'
   const qualLbl = document.createElement('span')
-  qualLbl.style.cssText = 'font-size:11px;color:#aaa;min-width:36px;'
+  qualLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);min-width:36px;'
   qualLbl.textContent = '90%'
   qualSlider.addEventListener('input', () => { qualLbl.textContent = qualSlider.value + '%' })
 
@@ -225,7 +225,7 @@ function buildImages(wrap) {
   const outDirBtn = btn('<i class="fa-solid fa-folder"></i> Dossier de sortie')
   let outDir = null
   const outDirLbl = document.createElement('span')
-  outDirLbl.style.cssText = 'font-size:11px;color:#666;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+  outDirLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
   outDirLbl.textContent = 'Même dossier que les fichiers sources'
   const goBtn = btn('<i class="fa-solid fa-rotate"></i> Convertir tout', true)
   const status = statusEl()
@@ -293,7 +293,7 @@ function audioArgs(fmt, bitrate) {
 
 function buildAudio(wrap) {
   const note = document.createElement('div')
-  note.style.cssText = 'font-size:11px;color:#888;'
+  note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
   note.textContent = 'Convertissez des fichiers audio entre formats via FFmpeg.'
 
   const list = fileList(AUDIO_EXTS)
@@ -314,7 +314,7 @@ function buildAudio(wrap) {
   const outDirBtn = btn('<i class="fa-solid fa-folder"></i> Dossier de sortie')
   let outDir = null
   const outDirLbl = document.createElement('span')
-  outDirLbl.style.cssText = 'font-size:11px;color:#666;flex:1;'
+  outDirLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;'
   outDirLbl.textContent = 'Même dossier'
   const goBtn = btn('<i class="fa-solid fa-rotate"></i> Convertir tout', true)
   const status = statusEl()
@@ -406,7 +406,7 @@ function videoArgs(fmt, quality, resVal) {
 
 function buildVideo(wrap) {
   const note = document.createElement('div')
-  note.style.cssText = 'font-size:11px;color:#888;'
+  note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
   note.textContent = 'Convertissez des vidéos via FFmpeg. Le GIF animé fonctionne aussi.'
 
   const list = fileList(VIDEO_EXTS)
@@ -421,7 +421,7 @@ function buildVideo(wrap) {
   const outDirBtn = btn('<i class="fa-solid fa-folder"></i> Dossier de sortie')
   let outDir = null
   const outDirLbl = document.createElement('span')
-  outDirLbl.style.cssText = 'font-size:11px;color:#666;flex:1;'
+  outDirLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;'
   outDirLbl.textContent = 'Même dossier'
   const goBtn = btn('<i class="fa-solid fa-rotate"></i> Convertir tout', true)
   const status = statusEl()
@@ -486,7 +486,7 @@ const DOC_FMTS = [
 
 function buildDocuments(wrap) {
   const note = document.createElement('div')
-  note.style.cssText = 'font-size:11px;color:#888;'
+  note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
   note.textContent = 'Conversion de documents via LibreOffice (doit être installé). Supporte PDF, DOCX, ODT, TXT, HTML, EPUB…'
 
   const sofficePath = { value: null }
@@ -498,15 +498,15 @@ function buildDocuments(wrap) {
     sofficePath.value = p || null
     if (p) {
       loBadge.textContent = '✓ LibreOffice détecté'
-      loBadge.style.color = '#52b152'
+      loBadge.style.color = 'var(--success)'
     } else {
       loBadge.textContent = '✗ LibreOffice non trouvé — installez-le sur libreoffice.org'
-      loBadge.style.color = '#e09052'
+      loBadge.style.color = 'var(--warning)'
     }
   })()
 
   const loBadge = document.createElement('div')
-  loBadge.style.cssText = 'font-size:10px;color:#888;'
+  loBadge.style.cssText = 'font-size:10px;color:var(--text-secondary);'
   loBadge.textContent = 'Détection de LibreOffice…'
 
   const list = fileList(DOC_EXTS)
@@ -518,7 +518,7 @@ function buildDocuments(wrap) {
   const outDirBtn = btn('<i class="fa-solid fa-folder"></i> Dossier de sortie')
   let outDir = null
   const outDirLbl = document.createElement('span')
-  outDirLbl.style.cssText = 'font-size:11px;color:#666;flex:1;'
+  outDirLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;'
   outDirLbl.textContent = 'Même dossier'
   const goBtn = btn('<i class="fa-solid fa-rotate"></i> Convertir tout', true)
   const status = statusEl()
@@ -566,7 +566,7 @@ function pdfFileRow(label_) {
   row.style.cssText = 'display:flex;gap:8px;align-items:center;'
   const pickBtn = btn(`<i class="fa-solid fa-file-pdf"></i> ${label_}`)
   const lbl = document.createElement('span')
-  lbl.style.cssText = 'flex:1;font-size:11px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+  lbl.style.cssText = 'flex:1;font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
   lbl.textContent = 'Aucun fichier'
   row.append(pickBtn, lbl)
   let path = null
@@ -601,7 +601,7 @@ function buildPdf(wrap) {
   for (const t of PDF_SUBTABS) {
     const tb = document.createElement('button')
     tb.textContent = t.label
-    tb.style.cssText = BTN + 'background:none;color:#888;border:1px solid transparent;'
+    tb.style.cssText = BTN + 'background:none;color:var(--text-secondary);border:1px solid transparent;'
 
     const panel = document.createElement('div')
     panel.style.cssText = 'display:none;flex-direction:column;gap:8px;padding-top:10px;'
@@ -611,12 +611,12 @@ function buildPdf(wrap) {
     tb.addEventListener('click', () => {
       if (activeId) {
         panels[activeId].btn.style.background = 'none'
-        panels[activeId].btn.style.color = '#888'
+        panels[activeId].btn.style.color = 'var(--text-secondary)'
         panels[activeId].btn.style.borderColor = 'transparent'
         panels[activeId].panel.style.display = 'none'
       }
       activeId = t.id
-      tb.style.background = 'rgba(255,255,255,0.08)'
+      tb.style.background = 'color-mix(in srgb, var(--text-primary) 8%, transparent)'
       tb.style.color = 'var(--text-primary,#ddd)'
       tb.style.borderColor = 'var(--win-border-in,#333)'
       panel.style.display = 'flex'
@@ -651,7 +651,7 @@ function buildPdfMerge(wrap) {
 function buildPdfSplit(wrap) {
   const picker = pdfFileRow('Choisir un PDF')
   const infoLbl = document.createElement('div')
-  infoLbl.style.cssText = 'font-size:11px;color:#888;'
+  infoLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);'
   const goBtn = btn('<i class="fa-solid fa-scissors"></i> Diviser en pages', true)
   const status = statusEl()
   wrap.append(picker.el, infoLbl, goBtn, status)
@@ -704,7 +704,7 @@ function buildPdfRotate(wrap) {
 
 function buildPdfReorder(wrap) {
   const picker = pdfFileRow('Choisir un PDF')
-  const infoLbl = document.createElement('div'); infoLbl.style.cssText = 'font-size:11px;color:#888;'
+  const infoLbl = document.createElement('div'); infoLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);'
   const orderInp = document.createElement('input'); orderInp.type='text'; orderInp.placeholder='Ordre (ex: 3,1,2,4)'; orderInp.style.cssText=INP+'width:100%;box-sizing:border-box;'
   const goBtn = btn('<i class="fa-solid fa-sort"></i> Réordonner', true)
   const status = statusEl()
@@ -780,7 +780,7 @@ export function initConverter(body) {
   for (const tab of TABS) {
     const tabBtn = document.createElement('button')
     tabBtn.innerHTML = `<i class="${tab.icon}" style="margin-right:5px;"></i>${tab.label}`
-    tabBtn.style.cssText = 'background:none;border:none;border-bottom:2px solid transparent;color:#888;padding:9px 14px;cursor:pointer;font-size:11px;font-family:inherit;white-space:nowrap;transition:color 0.15s;'
+    tabBtn.style.cssText = 'background:none;border:none;border-bottom:2px solid transparent;color:var(--text-secondary);padding:9px 14px;cursor:pointer;font-size:11px;font-family:inherit;white-space:nowrap;transition:color 0.15s;'
 
     const panel = document.createElement('div')
     panel.style.cssText = 'position:absolute;inset:0;display:none;overflow-y:auto;'
@@ -790,7 +790,7 @@ export function initConverter(body) {
     tabBtn.addEventListener('click', () => {
       if (activeId) {
         panels[activeId].btn.style.borderBottomColor = 'transparent'
-        panels[activeId].btn.style.color = '#888'
+        panels[activeId].btn.style.color = 'var(--text-secondary)'
         panels[activeId].panel.style.display = 'none'
       }
       activeId = tab.id

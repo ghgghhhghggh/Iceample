@@ -3,6 +3,7 @@ import { t } from './i18n.js'
 import { pushHistory } from './history.js'
 import { matchesShortcut, getShortcut, formatBinding, DEFAULT_SHORTCUTS } from './shortcuts.js'
 import { registerCommands, unregisterCommandsBy } from './commands.js'
+import { themeColor } from './theme.js'
 
 function injectFxMenuStyles() {
   if (document.getElementById('ed-fx-menu-styles')) return
@@ -12,7 +13,7 @@ function injectFxMenuStyles() {
 .ed-fx-menu-pop {
   position: fixed; display: none; flex-direction: column; gap: 1px;
   min-width: 220px; padding: 5px; z-index: 9999;
-  background: #121214; border: 1px solid #2c2c2e; border-radius: 8px;
+  background: var(--surface2); border: 1px solid var(--win-border); border-radius: 8px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.7);
 }
 .ed-fx-menu-pop.open { display: flex; }
@@ -23,14 +24,14 @@ function injectFxMenuStyles() {
   font-family: inherit; font-size: 11px; cursor: pointer; text-align: left;
   transition: background 0.1s, color 0.1s;
 }
-.ed-fx-menu-row:hover { background: rgba(255,255,255,0.06); color: var(--text-primary, #fff); }
+.ed-fx-menu-row:hover { background: var(--hover); color: var(--text-primary, #fff); }
 .ed-fx-menu-row > i { width: 14px; text-align: center; font-size: 11px; color: var(--color-active, #4a9eff); flex-shrink: 0; }
 .ed-fx-menu-lbl { flex: 1; }
 .ed-fx-menu-kbd {
-  font-size: 9px; color: #777; font-variant-numeric: tabular-nums;
+  font-size: 9px; color: var(--text-secondary); font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em; padding-left: 10px; white-space: nowrap;
 }
-.ed-fx-menu-sep { height: 1px; margin: 4px 6px; background: rgba(255,255,255,0.08); }
+.ed-fx-menu-sep { height: 1px; margin: 4px 6px; background: color-mix(in srgb, var(--text-primary) 8%, transparent); }
   `
   document.head.appendChild(s)
 }
@@ -251,9 +252,10 @@ export function initEditor(body) {
     g.fillRect(0, 0, inX, H)
     g.fillRect(outX, 0, W - outX, H)
 
-    g.strokeStyle = 'rgba(255,255,255,0.85)'
+    g.strokeStyle = themeColor('--text-primary'); g.globalAlpha = 0.85
     g.lineWidth = 1
     ;[inX, outX].forEach(x => { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke() })
+    g.globalAlpha = 1
 
     tinEl.style.left  = (inX  - 6) + 'px'
     toutEl.style.left = (outX - 6) + 'px'
@@ -480,9 +482,12 @@ export function initEditor(body) {
     { id: 'editor:paste',          titleKey: 'sc_ed_paste',         icon: 'fa-solid fa-paste',               category: 'tool_editor', shortcutAction: 'ed-paste',         run: () => pasteClipboard() },
   ])
 
+  const onThemeChange = () => { if (buffer) drawWaveform() }
+  window.addEventListener('iceample-theme-changed', onThemeChange)
   new MutationObserver((_, obs) => {
     if (!body.isConnected) {
       document.removeEventListener('keydown', onEdKey); closeFxMenu()
+      window.removeEventListener('iceample-theme-changed', onThemeChange)
       unregisterCommandsBy(c => c.id.startsWith('editor:'))
       obs.disconnect()
     }

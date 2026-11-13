@@ -23,23 +23,35 @@ export const themeMap = {
   'th-vu-low':         '--vu-color-low',
   'th-vu-mid':         '--vu-color-mid',
   'th-vu-high':        '--vu-color-high',
+  'th-surface2':       '--surface2',
+  'th-preview-bg':     '--preview-bg',
+  'th-on-accent':      '--on-accent',
+  'th-danger':         '--danger',
+  'th-success':        '--success',
+  'th-warning':        '--warning',
 }
+
+// Set by presets only (no picker): workbench wall shading, lowered by light themes.
+const PRESET_ONLY_VARS = ['--wb-shade']
+const ALL_THEME_VARS = () => [...Object.values(themeMap), ...PRESET_ONLY_VARS]
 
 // ── Presets ───────────────────────────────────────────────────────────────────
 const THEME_PRESETS = {
   'Iceample':  { '--workbench-bg':'#0c0a12','--text-primary':'#f2ecff','--text-secondary':'#8a7ba5','--color-active':'#b23fd6','--color-active-2':'#8ed531','--slider-color':'#b23fd6','--surface':'#16121e','--win-border':'#2c2340','--win-border-in':'#201830','--btn-primary':'#b23fd6','--daw-clip-color':'#8ed531','--master-color':'#ee6a1e','--vu-color-low':'#8ed531','--vu-color-mid':'#ee6a1e','--vu-color-high':'#ff4d6d' },
-  'Arctic':    { '--workbench-bg':'#141a20','--text-primary':'#eaf2f8','--text-secondary':'#6a8296','--color-active':'#7ec8e3','--color-active-2':'#a3d9c9','--slider-color':'#7ec8e3','--surface':'#1b232c','--win-border':'#2c3a46','--win-border-in':'#212b34','--btn-primary':'#7ec8e3','--daw-clip-color':'#5e9dc4','--master-color':'#4a7a96','--vu-color-low':'#8fd4a8','--vu-color-mid':'#e9c46a','--vu-color-high':'#e07a5f' },
+  'Arctic':    { '--on-accent':'#0b1a22', '--workbench-bg':'#141a20','--text-primary':'#eaf2f8','--text-secondary':'#6a8296','--color-active':'#7ec8e3','--color-active-2':'#a3d9c9','--slider-color':'#7ec8e3','--surface':'#1b232c','--win-border':'#2c3a46','--win-border-in':'#212b34','--btn-primary':'#7ec8e3','--daw-clip-color':'#5e9dc4','--master-color':'#4a7a96','--vu-color-low':'#8fd4a8','--vu-color-mid':'#e9c46a','--vu-color-high':'#e07a5f' },
   'Midnight':  { '--workbench-bg':'#080b16','--text-primary':'#dde4ff','--text-secondary':'#5566a6','--color-active':'#6d8bff','--color-active-2':'#3fd0e0','--slider-color':'#6d8bff','--surface':'#111528','--win-border':'#1c2444','--win-border-in':'#141a30','--btn-primary':'#6d8bff','--daw-clip-color':'#4560e0','--master-color':'#2f47c0','--vu-color-low':'#39d98a','--vu-color-mid':'#e6c34a','--vu-color-high':'#ff5d6c' },
   'Nebula':    { '--workbench-bg':'#0d0818','--text-primary':'#f0e2ff','--text-secondary':'#8b6fb0','--color-active':'#a855f7','--color-active-2':'#ff5db1','--slider-color':'#a855f7','--surface':'#1a1230','--win-border':'#2e1f4a','--win-border-in':'#221636','--btn-primary':'#a855f7','--daw-clip-color':'#7c3aed','--master-color':'#c026d3','--vu-color-low':'#41d99a','--vu-color-mid':'#f0b429','--vu-color-high':'#ff5d8f' },
   'Ember':     { '--workbench-bg':'#140a06','--text-primary':'#ffe9d6','--text-secondary':'#a57a5a','--color-active':'#ff7a30','--color-active-2':'#ffc24b','--slider-color':'#ff7a30','--surface':'#1f130b','--win-border':'#3a2113','--win-border-in':'#2a180d','--btn-primary':'#ff7a30','--daw-clip-color':'#e0641a','--master-color':'#c0410a','--vu-color-low':'#8ed531','--vu-color-mid':'#ff9e40','--vu-color-high':'#ff4d4d' },
   'Crimson':   { '--workbench-bg':'#140809','--text-primary':'#ffe0e4','--text-secondary':'#9c5a63','--color-active':'#ff3b5c','--color-active-2':'#ff8fa3','--slider-color':'#ff3b5c','--surface':'#201014','--win-border':'#3a1620','--win-border-in':'#2a0f18','--btn-primary':'#ff3b5c','--daw-clip-color':'#c81e3c','--master-color':'#961830','--vu-color-low':'#41d99a','--vu-color-mid':'#ffb04a','--vu-color-high':'#ff2d55' },
-  'Aurora':    { '--workbench-bg':'#04120e','--text-primary':'#d6f5e6','--text-secondary':'#5a9a80','--color-active':'#25d97a','--color-active-2':'#37e0d0','--slider-color':'#25d97a','--surface':'#0b2019','--win-border':'#154034','--win-border-in':'#0e2c22','--btn-primary':'#25d97a','--daw-clip-color':'#12a866','--master-color':'#0e7a52','--vu-color-low':'#25d97a','--vu-color-mid':'#e6c34a','--vu-color-high':'#ff5d6c' },
-  'Gold':      { '--workbench-bg':'#12100a','--text-primary':'#fff4d6','--text-secondary':'#9c8a55','--color-active':'#f0c020','--color-active-2':'#e8894b','--slider-color':'#f0c020','--surface':'#1e1a10','--win-border':'#3a3016','--win-border-in':'#2a220f','--btn-primary':'#f0c020','--daw-clip-color':'#c99a1e','--master-color':'#a06a12','--vu-color-low':'#8ed531','--vu-color-mid':'#f0c020','--vu-color-high':'#ff5d4d' },
+  'Aurora':    { '--on-accent':'#03140c', '--workbench-bg':'#04120e','--text-primary':'#d6f5e6','--text-secondary':'#5a9a80','--color-active':'#25d97a','--color-active-2':'#37e0d0','--slider-color':'#25d97a','--surface':'#0b2019','--win-border':'#154034','--win-border-in':'#0e2c22','--btn-primary':'#25d97a','--daw-clip-color':'#12a866','--master-color':'#0e7a52','--vu-color-low':'#25d97a','--vu-color-mid':'#e6c34a','--vu-color-high':'#ff5d6c' },
+  'Gold':      { '--on-accent':'#1a1400', '--workbench-bg':'#12100a','--text-primary':'#fff4d6','--text-secondary':'#9c8a55','--color-active':'#f0c020','--color-active-2':'#e8894b','--slider-color':'#f0c020','--surface':'#1e1a10','--win-border':'#3a3016','--win-border-in':'#2a220f','--btn-primary':'#f0c020','--daw-clip-color':'#c99a1e','--master-color':'#a06a12','--vu-color-low':'#8ed531','--vu-color-mid':'#f0c020','--vu-color-high':'#ff5d4d' },
   'Neon':      { '--workbench-bg':'#07070d','--text-primary':'#eafcff','--text-secondary':'#5f7f96','--color-active':'#ff2ec4','--color-active-2':'#22e0ff','--slider-color':'#ff2ec4','--surface':'#10101c','--win-border':'#241a3a','--win-border-in':'#181026','--btn-primary':'#ff2ec4','--daw-clip-color':'#b026ff','--master-color':'#00d0ff','--vu-color-low':'#2effc4','--vu-color-mid':'#ffe12e','--vu-color-high':'#ff2e6a' },
-  'Mono':      { '--workbench-bg':'#0c0c0e','--text-primary':'#eaeaec','--text-secondary':'#7a7a80','--color-active':'#c8c8d0','--color-active-2':'#9a9aa2','--slider-color':'#c8c8d0','--surface':'#17171a','--win-border':'#2c2c30','--win-border-in':'#202024','--btn-primary':'#c8c8d0','--daw-clip-color':'#6a6a72','--master-color':'#4a4a50','--vu-color-low':'#8ed531','--vu-color-mid':'#e6c34a','--vu-color-high':'#ff5d6c' },
+  'Mono':      { '--on-accent':'#111114', '--workbench-bg':'#0c0c0e','--text-primary':'#eaeaec','--text-secondary':'#7a7a80','--color-active':'#c8c8d0','--color-active-2':'#9a9aa2','--slider-color':'#c8c8d0','--surface':'#17171a','--win-border':'#2c2c30','--win-border-in':'#202024','--btn-primary':'#c8c8d0','--daw-clip-color':'#6a6a72','--master-color':'#4a4a50','--vu-color-low':'#8ed531','--vu-color-mid':'#e6c34a','--vu-color-high':'#ff5d6c' },
+  // Light theme: everything the tools draw now follows these variables.
+  'Daylight':  { '--workbench-bg':'#e9e6f0','--text-primary':'#1d1729','--text-secondary':'#655c7a','--color-active':'#8a2bc7','--color-active-2':'#4f9a1a','--slider-color':'#8a2bc7','--surface':'#fbfaff','--surface2':'#efecf5','--win-border':'#cdc5dc','--win-border-in':'#e3dded','--btn-primary':'#8a2bc7','--daw-clip-color':'#79b83a','--master-color':'#d9480f','--vu-color-low':'#2f9e44','--vu-color-mid':'#e8590c','--vu-color-high':'#e03131','--on-accent':'#ffffff','--danger':'#d6334f','--success':'#2b9a5f','--warning':'#c98a06','--preview-bg':'#d9d4e3','--wb-shade':'rgba(60, 40, 90, 0.12)' },
 }
-const PRESET_COLORS  = { 'Iceample':'#0c0a12','Arctic':'#141a20','Midnight':'#080b16','Nebula':'#0d0818','Ember':'#140a06','Crimson':'#140809','Aurora':'#04120e','Gold':'#12100a','Neon':'#07070d','Mono':'#0c0c0e' }
-const PRESET_ACCENTS = { 'Iceample':'#b23fd6','Arctic':'#7ec8e3','Midnight':'#6d8bff','Nebula':'#a855f7','Ember':'#ff7a30','Crimson':'#ff3b5c','Aurora':'#25d97a','Gold':'#f0c020','Neon':'#ff2ec4','Mono':'#c8c8d0' }
+const PRESET_COLORS  = { 'Daylight':'#e9e6f0', 'Iceample':'#0c0a12','Arctic':'#141a20','Midnight':'#080b16','Nebula':'#0d0818','Ember':'#140a06','Crimson':'#140809','Aurora':'#04120e','Gold':'#12100a','Neon':'#07070d','Mono':'#0c0c0e' }
+const PRESET_ACCENTS = { 'Daylight':'#8a2bc7', 'Iceample':'#b23fd6','Arctic':'#7ec8e3','Midnight':'#6d8bff','Nebula':'#a855f7','Ember':'#ff7a30','Crimson':'#ff3b5c','Aurora':'#25d97a','Gold':'#f0c020','Neon':'#ff2ec4','Mono':'#c8c8d0' }
 
 // ── Module-level DOM references (set by initTheme) ────────────────────────────
 let _wbBgImg = null
@@ -63,13 +75,47 @@ export function applyThemeObj(obj) {
     document.documentElement.style.setProperty(cssVar, val)
     try { localStorage.setItem('theme:' + cssVar, val) } catch {}
   })
-  // Sync color pickers
+  // A theme that doesn't set one of the newer colours (older presets, imported
+  // files) gets its default back instead of keeping the previous theme's value.
+  for (const cssVar of ALL_THEME_VARS()) {
+    if (cssVar in obj) continue
+    document.documentElement.style.removeProperty(cssVar)
+    try { localStorage.removeItem('theme:' + cssVar) } catch {}
+  }
+  syncThemeInputs()
+  notifyThemeChange()
+}
+
+/** Remove every colour set in the Theme tab: back to the default theme. */
+export function resetThemeColors() {
+  for (const cssVar of ALL_THEME_VARS()) {
+    document.documentElement.style.removeProperty(cssVar)
+    try { localStorage.removeItem('theme:' + cssVar) } catch {}
+  }
+  syncThemeInputs()
+  notifyThemeChange()
+}
+
+/** The colour a variable currently resolves to, as #rrggbb (for the pickers;
+ *  derived values such as color-mix() are resolved too). */
+export function resolveVarHex(cssVar) {
+  const probe = document.createElement('span')
+  probe.style.cssText = `position:absolute;visibility:hidden;pointer-events:none;color:var(${cssVar})`
+  document.body.appendChild(probe)
+  const c = getComputedStyle(probe).color
+  probe.remove()
+  const n = (c.match(/[\d.]+/g) || []).map(Number)
+  if (n.length < 3) return '#000000'
+  const scale = c.startsWith('color(') ? 255 : 1   // color(srgb r g b) uses 0–1
+  return '#' + n.slice(0, 3).map(v => Math.max(0, Math.min(255, Math.round(v * scale))).toString(16).padStart(2, '0')).join('')
+}
+
+/** Show the colour actually in use in every picker of the Theme tab. */
+export function syncThemeInputs() {
   Object.entries(themeMap).forEach(([id, cssVar]) => {
     const inp = document.getElementById(id)
-    const val = obj[cssVar]
-    if (inp && val) inp.value = val
+    if (inp) inp.value = resolveVarHex(cssVar)
   })
-  notifyThemeChange()
 }
 
 // ── Background image ──────────────────────────────────────────────────────────
@@ -125,17 +171,14 @@ export function initTheme(workbench) {
   workbench.appendChild(_wbBgImg)
   applyWbImage()
 
-  // Restore saved color pickers
-  Object.entries(themeMap).forEach(([id, cssVar]) => {
+  // Restore saved colours (pickers and preset-only variables)
+  for (const cssVar of ALL_THEME_VARS()) {
     try {
       const saved = localStorage.getItem('theme:' + cssVar)
-      if (saved) {
-        document.documentElement.style.setProperty(cssVar, saved)
-        const inp = document.getElementById(id)
-        if (inp) inp.value = saved
-      }
+      if (saved) document.documentElement.style.setProperty(cssVar, saved)
     } catch {}
-  })
+  }
+  syncThemeInputs()
 
   // Restore font
   try {
@@ -166,7 +209,22 @@ export function initTheme(workbench) {
 let _onThemeChange = null
 
 /** Call after any color picker change to keep preset highlight in sync. */
-export function notifyThemeChange() { _onThemeChange?.() }
+export function notifyThemeChange() {
+  _colorCache.clear()
+  _onThemeChange?.()
+  // Canvas-drawn UI (meters, graphs) listens to this to repaint with the new colours.
+  window.dispatchEvent(new CustomEvent('iceample-theme-changed'))
+}
+
+// ── Theme colours for canvas drawing ──────────────────────────────────────────
+// A canvas can't read CSS variables: themeColor('--surface2') gives the colour
+// in use as #rrggbb (cached until the theme changes). Use it for UI drawn on a
+// canvas (graph backgrounds, grids, meter wells) — never for user content.
+const _colorCache = new Map()
+export function themeColor(cssVar) {
+  if (!_colorCache.has(cssVar)) _colorCache.set(cssVar, resolveVarHex(cssVar))
+  return _colorCache.get(cssVar)
+}
 
 // ── Build theme settings tab ──────────────────────────────────────────────────
 export function buildThemeExtras() {
@@ -262,9 +320,11 @@ export function buildThemeExtras() {
   exportBtn.innerHTML = `<i class="fa-solid fa-file-export"></i> ${t('theme_export')}`
   exportBtn.addEventListener('click', () => {
     const out = {}
-    Object.values(themeMap).forEach(cssVar => {
-      const val = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim()
-      if (val) out[cssVar] = val
+    ALL_THEME_VARS().forEach(cssVar => {
+      // Only what is set (by hand or by a preset): derived defaults stay derived.
+      const val = document.documentElement.style.getPropertyValue(cssVar).trim()
+        || getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim()
+      if (val && !val.startsWith('color-mix')) out[cssVar] = val
     })
     try {
       const ff = localStorage.getItem('theme:--font-family') || ''

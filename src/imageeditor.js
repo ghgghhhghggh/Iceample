@@ -9,6 +9,7 @@ import { getShortcut } from './shortcuts.js'
 import { showPalPicker } from './palettes.js'
 import { makeSendButton, imageMedia } from './media-bus.js'
 import { registerTool, toDataURLAsync } from './project.js'
+import { themeColor } from './theme.js'
 
 function injectStyles() {
   if (document.getElementById('ie-styles')) return
@@ -29,19 +30,19 @@ function injectStyles() {
 .ie-tab { display:flex; align-items:center; gap:7px; padding:5px 9px; border:1px solid var(--win-border-in,#1e1e1e); border-bottom:none;
   border-radius:6px 6px 0 0; background:color-mix(in srgb,var(--text-primary) 5%,var(--surface)); color:var(--text-secondary,#9a9aa3); font-size:11px; cursor:pointer; white-space:nowrap; transition:background .12s ease,color .12s ease; }
 .ie-tab:hover { color:var(--text-primary,#fff); }
-.ie-tab.sel { background:color-mix(in srgb,var(--surface) 55%,#000); color:var(--text-primary,#fff); border-color:var(--win-border,#2c2c2e); box-shadow:inset 0 2px 0 var(--color-active,#4a9eff); }
+.ie-tab.sel { background:var(--preview-bg); color:var(--text-primary,#fff); border-color:var(--win-border,#2c2c2e); box-shadow:inset 0 2px 0 var(--color-active,#4a9eff); }
 .ie-tab .dot { width:6px; height:6px; border-radius:50%; background:var(--color-active,#4a9eff); flex-shrink:0; }
 .ie-tab .x { opacity:.5; font-size:11px; }
-.ie-tab .x:hover { opacity:1; color:#ff6a6a; }
+.ie-tab .x:hover { opacity:1; color:var(--danger); }
 .ie-tab-new { padding:5px 10px; background:none; border:none; color:var(--text-secondary,#9a9aa3); cursor:pointer; font-size:13px; }
 .ie-tab-new:hover { color:var(--color-active,#4a9eff); }
 .ie-main { flex:1; display:flex; min-height:0; }
-.ie-wrap { flex:1; position:relative; overflow:hidden; min-width:0; background:color-mix(in srgb,var(--surface) 55%,#000); }
+.ie-wrap { flex:1; position:relative; overflow:hidden; min-width:0; background:var(--preview-bg); }
 .ie-wrap canvas { display:block; width:100%; height:100%; }
-.ie-empty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:#5f6068; font-size:12px; pointer-events:none; }
+.ie-empty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:var(--text-secondary); font-size:12px; pointer-events:none; }
 .ie-empty .ie-btn { pointer-events:auto; }
 .ie-panel { width:23%; min-width:192px; max-width:310px; flex-shrink:0; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden;
-  background:color-mix(in srgb,var(--surface) 80%,#000); border-left:1px solid var(--win-border-in,#1e1e1e); padding:12px 12px 16px; box-shadow:inset 8px 0 16px -16px #000; }
+  background:var(--surface2); border-left:1px solid var(--win-border-in,#1e1e1e); padding:12px 12px 16px; box-shadow:inset 8px 0 16px -16px #000; }
 .ie-tools { display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
 .ie-tbtn { width:100%; height:32px; display:flex; align-items:center; gap:9px; padding:0 11px; border:1px solid var(--win-border,#2a2a2a); background:color-mix(in srgb,var(--text-primary) 7%,var(--surface)); color:var(--text-secondary,#aaa); border-radius:7px; cursor:pointer; font-size:12px; font-family:inherit; transition:background .12s ease,color .12s ease,border-color .12s ease,transform .08s ease; }
 .ie-tbtn i { width:15px; text-align:center; font-size:13px; }
@@ -49,10 +50,10 @@ function injectStyles() {
 .ie-tbtn:active { transform:scale(.98); }
 .ie-tbtn.on { background:color-mix(in srgb, var(--color-active,#4a9eff) 20%, transparent); color:var(--color-active,#4a9eff); border-color:var(--color-active,#4a9eff); box-shadow:0 0 0 1px color-mix(in srgb, var(--color-active,#4a9eff) 30%, transparent); }
 .ie-brush-ctl { margin-top:-2px; padding:10px 10px 9px; border:1px solid color-mix(in srgb, var(--color-active,#4a9eff) 30%, transparent); border-radius:7px;
-  background:color-mix(in srgb, var(--color-active,#4a9eff) 8%, #141419); box-shadow:0 2px 8px -4px rgba(0,0,0,.5); animation:ie-ctl-in .12s ease; }
+  background:color-mix(in srgb, var(--color-active,#4a9eff) 8%, var(--surface2)); box-shadow:0 2px 8px -4px rgba(0,0,0,.5); animation:ie-ctl-in .12s ease; }
 @keyframes ie-ctl-in { from{opacity:0;transform:translateY(-3px)} to{opacity:1;transform:translateY(0)} }
 .ie-brush-ctl .ie-field:last-child { margin-bottom:0; }
-.ie-sec-h { font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:#7d7f88; margin:15px 0 8px; padding-bottom:6px; border-bottom:1px solid var(--win-border-in,#1e1e1e); }
+.ie-sec-h { font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--text-secondary); margin:15px 0 8px; padding-bottom:6px; border-bottom:1px solid var(--win-border-in,#1e1e1e); }
 .ie-sec-h:first-child { margin-top:0; }
 .ie-layer { position:relative; display:flex; align-items:center; gap:7px; padding:6px 7px 6px 10px; border-radius:6px; cursor:pointer; font-size:11px; color:var(--text-secondary,#9a9aa3); border:1px solid transparent; transition:background .12s ease,color .12s ease; }
 .ie-layer:hover { background:color-mix(in srgb,var(--text-primary) 8%,var(--surface)); }
@@ -61,24 +62,24 @@ function injectStyles() {
 .ie-layer .nm { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ie-layer .act { opacity:.5; cursor:pointer; font-size:11px; width:14px; text-align:center; transition:opacity .1s ease,color .1s ease; }
 .ie-layer .act:hover { opacity:1; }
-.ie-layer .act.del:hover { color:#ff6a6a; }
-.ie-layer-rename { flex:1; min-width:0; background:color-mix(in srgb,var(--surface) 60%,#000); border:1px solid var(--color-active,#4a9eff); border-radius:4px; color:var(--text-primary,#fff); font-family:inherit; font-size:11px; padding:1px 4px; outline:none; }
+.ie-layer .act.del:hover { color:var(--danger); }
+.ie-layer-rename { flex:1; min-width:0; background:var(--surface2); border:1px solid var(--color-active,#4a9eff); border-radius:4px; color:var(--text-primary,#fff); font-family:inherit; font-size:11px; padding:1px 4px; outline:none; }
 .ie-field { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
 .ie-field > label { font-size:11px; color:var(--text-secondary,#9a9aa3); width:66px; flex-shrink:0; }
-.ie-field input[type=range] { flex:1; min-width:0; accent-color:var(--color-active,#4a9eff); }
-.ie-field .v { font-size:10px; color:#9a9aa3; width:34px; text-align:right; flex-shrink:0; font-variant-numeric:tabular-nums; }
-.ie-noadj { font-size:11px; color:#5f6068; text-align:center; padding:16px 6px; }
-.ie-num { flex:1; min-width:0; background:color-mix(in srgb,var(--surface) 70%,#000); border:1px solid var(--win-border,#2a2a2a); border-radius:5px; color:var(--text-primary,#eee); font-family:inherit; font-size:12px; padding:5px 8px; outline:none; }
+.ie-field input[type=range] { flex:1; min-width:0; accent-color:var(--slider-color); }
+.ie-field .v { font-size:10px; color:var(--text-secondary); width:34px; text-align:right; flex-shrink:0; font-variant-numeric:tabular-nums; }
+.ie-noadj { font-size:11px; color:var(--text-secondary); text-align:center; padding:16px 6px; }
+.ie-num { flex:1; min-width:0; background:var(--surface2); border:1px solid var(--win-border,#2a2a2a); border-radius:5px; color:var(--text-primary,#eee); font-family:inherit; font-size:12px; padding:5px 8px; outline:none; }
 .ie-num:focus { border-color:var(--color-active,#4a9eff); }
 .ie-reset { width:100%; justify-content:center; margin-top:6px; }
-.ie-adjbox { border:1px solid var(--win-border-in,#1e1e1e); border-radius:9px; padding:10px 10px 6px; background:color-mix(in srgb,var(--surface) 75%,#000); box-shadow:0 2px 10px -6px rgba(0,0,0,.6); }
+.ie-adjbox { border:1px solid var(--win-border-in,#1e1e1e); border-radius:9px; padding:10px 10px 6px; background:var(--surface2); box-shadow:0 2px 10px -6px rgba(0,0,0,.6); }
 .ie-lib-ov { position:absolute; inset:0; z-index:20; background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; }
 .ie-lib-card { width:80%; max-width:520px; max-height:80%; overflow:auto; background:var(--surface,#16161a); border:1px solid var(--win-border,#2c2c2e); border-radius:10px; padding:12px; }
 .ie-lib-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(90px,1fr)); gap:8px; margin-top:8px; }
-.ie-lib-item { border:1px solid var(--win-border,#2a2a2a); border-radius:6px; overflow:hidden; cursor:pointer; background:color-mix(in srgb,var(--surface) 75%,#000); transition:border-color .12s ease; }
+.ie-lib-item { border:1px solid var(--win-border,#2a2a2a); border-radius:6px; overflow:hidden; cursor:pointer; background:var(--surface2); transition:border-color .12s ease; }
 .ie-lib-item:hover { border-color:var(--color-active,#4a9eff); }
 .ie-lib-item img { width:100%; height:70px; object-fit:cover; display:block; }
-.ie-lib-item span { display:block; font-size:9px; color:#9a9aa3; padding:3px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ie-lib-item span { display:block; font-size:9px; color:var(--text-secondary); padding:3px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ie-drop-ov { position:absolute; inset:3px; z-index:30; display:flex; align-items:center; justify-content:center; background:color-mix(in srgb, var(--color-active,#4a9eff) 10%, transparent); border:2px dashed var(--color-active,#4a9eff); border-radius:6px; pointer-events:none; color:var(--color-active,#4a9eff); font-size:32px; }
 .ie-recover { position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:25; display:flex; align-items:center; gap:8px; padding:7px 10px;
   background:var(--surface,#16161a); border:1px solid var(--win-border,#2c2c2e); border-radius:8px; font-size:11px; color:var(--text-secondary,#9a9aa3); box-shadow:0 6px 18px -8px rgba(0,0,0,.7); animation:ie-ctl-in .12s ease; }
@@ -378,8 +379,11 @@ export function initImageEditor(body) {
 
   // ── Rendering ──────────────────────────────────────────────────────────────
   function drawChecker(g, w, h) {
+    // Theme-aware checker: preview background tinted 4% / 8% with the text colour.
     const s = 12; g.save()
-    for (let y = 0; y < h; y += s) for (let x = 0; x < w; x += s) { g.fillStyle = ((x / s + y / s) & 1) ? '#191920' : '#111116'; g.fillRect(x, y, s, s) }
+    g.fillStyle = themeColor('--preview-bg'); g.fillRect(0, 0, Math.ceil(w / s) * s, Math.ceil(h / s) * s)
+    g.fillStyle = themeColor('--text-primary')
+    for (let y = 0; y < h; y += s) for (let x = 0; x < w; x += s) { g.globalAlpha = ((x / s + y / s) & 1) ? 0.08 : 0.04; g.fillRect(x, y, s, s) }
     g.restore()
   }
   function drawLayerInto(g, L) {
@@ -454,7 +458,7 @@ export function initImageEditor(body) {
       ctx.save(); ctx.beginPath(); ctx.rect(0, 0, cur.docW, cur.docH); ctx.clip()
       for (const L of cur.layers) if (L.visible) drawLayerInto(ctx, L)
       ctx.restore()
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1 / scale; ctx.strokeRect(0, 0, cur.docW, cur.docH)
+      ctx.globalAlpha = 0.15; ctx.strokeStyle = themeColor('--text-primary'); ctx.lineWidth = 1 / scale; ctx.strokeRect(0, 0, cur.docW, cur.docH)
       ctx.restore()
     }
     updateZoomLabel()
@@ -611,7 +615,7 @@ export function initImageEditor(body) {
       const cf = el('div', 'ie-field'); cf.appendChild(el('label', null, t('ie_color')))
       const ci = el('input'); ci.type = 'color'; ci.value = brushColor; ci.style.cssText = 'width:40px;height:24px;padding:0;border:1px solid var(--win-border,#2a2a2a);border-radius:5px;background:none;cursor:pointer'
       ci.addEventListener('input', () => { brushColor = ci.value })
-      const pb = el('button'); pb.innerHTML = '<i class="fa-solid fa-palette" style="font-size:10px"></i>'; pb.style.cssText = 'width:24px;height:24px;border-radius:5px;border:1px solid var(--win-border,#2a2a2a);background:#1c1c20;color:#aaa;cursor:pointer;padding:0;flex-shrink:0'
+      const pb = el('button'); pb.innerHTML = '<i class="fa-solid fa-palette" style="font-size:10px"></i>'; pb.style.cssText = 'width:24px;height:24px;border-radius:5px;border:1px solid var(--win-border,#2a2a2a);background:var(--surface2);color:var(--text-secondary);cursor:pointer;padding:0;flex-shrink:0'
       pb.addEventListener('click', () => showPalPicker(pb, c => { brushColor = c; ci.value = c }))
       cf.append(ci, pb); bc.appendChild(cf)
       const sf = el('div', 'ie-field'); sf.style.marginBottom = '0'; sf.appendChild(el('label', null, t('ie_size')))
@@ -1723,7 +1727,8 @@ export function initImageEditor(body) {
   })
 
   const ro = new ResizeObserver(render); ro.observe(wrap)
+  window.addEventListener('iceample-theme-changed', render)   // repaint the checker / doc border
   newDoc(); cur = docs[0]; cur.infinite = true; addFill(cur, '#ffffff')   // start with an infinite white file
   render(); renderPanel(); renderTabs()
-  new MutationObserver((_, obs) => { if (!document.contains(body)) { ro.disconnect(); window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', endDrag); document.removeEventListener('keydown', onCopy); document.removeEventListener('keydown', onKeys, true); document.removeEventListener('paste', onPaste); tauriUnlistens.forEach(fn => fn?.()); obs.disconnect() } }).observe(document.body, { childList: true, subtree: true })
+  new MutationObserver((_, obs) => { if (!document.contains(body)) { ro.disconnect(); window.removeEventListener('iceample-theme-changed', render); window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', endDrag); document.removeEventListener('keydown', onCopy); document.removeEventListener('keydown', onKeys, true); document.removeEventListener('paste', onPaste); tauriUnlistens.forEach(fn => fn?.()); obs.disconnect() } }).observe(document.body, { childList: true, subtree: true })
 }

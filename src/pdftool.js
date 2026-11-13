@@ -61,7 +61,7 @@ function fileItem(path, onRemove) {
   name.textContent = shortName(path)
   const rm = document.createElement('button')
   rm.innerHTML = '<i class="fa-solid fa-xmark"></i>'
-  rm.style.cssText = 'background:none;border:none;color:#666;cursor:pointer;padding:2px 4px;font-size:11px;'
+  rm.style.cssText = 'background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:2px 4px;font-size:11px;'
   rm.addEventListener('click', onRemove)
   row.append(name, rm)
   return row
@@ -85,28 +85,28 @@ function btn(label, icon, primary) {
   b.innerHTML = `<i class="${icon}"></i> ${label}`
   b.style.cssText = `border:none;border-radius:5px;padding:7px 14px;cursor:pointer;font-size:11px;font-family:inherit;${
     primary
-      ? 'background:var(--color-active,#4a9eff);color:#fff;'
-      : 'background:#2a2a2a;border:1px solid #444;color:#ddd;'
+      ? 'background:var(--color-active,#4a9eff);color:var(--on-accent);'
+      : 'background:var(--surface2);border:1px solid var(--win-border);color:var(--text-primary);'
   }`
   return b
 }
 
 function statusDiv() {
   const d = document.createElement('div')
-  d.style.cssText = 'font-size:11px;color:#888;min-height:18px;'
+  d.style.cssText = 'font-size:11px;color:var(--text-secondary);min-height:18px;'
   return d
 }
 
 function setStatus(el, msg, type) {
   el.textContent = msg
-  el.style.color = type === 'error' ? '#e05252' : type === 'success' ? '#52b152' : '#888'
+  el.style.color = type === 'error' ? 'var(--danger)' : type === 'success' ? 'var(--success)' : 'var(--text-secondary)'
 }
 
 function fileListBox() {
   const box = document.createElement('div')
-  box.style.cssText = 'border:1px dashed #333;border-radius:6px;padding:8px;min-height:60px;max-height:200px;overflow-y:auto;'
+  box.style.cssText = 'border:1px dashed var(--win-border);border-radius:6px;padding:8px;min-height:60px;max-height:200px;overflow-y:auto;'
   const empty = document.createElement('div')
-  empty.style.cssText = 'font-size:11px;color:#555;text-align:center;padding:16px;'
+  empty.style.cssText = 'font-size:11px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);text-align:center;padding:16px;'
   empty.textContent = 'Aucun fichier'
   box.appendChild(empty)
 
@@ -141,7 +141,7 @@ function buildMerge(wrap) {
   row.append(addBtn, goBtn)
 
   const note = document.createElement('div')
-  note.style.cssText = 'font-size:10px;color:#555;'
+  note.style.cssText = 'font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);'
   note.textContent = 'Les fichiers seront fusionnés dans l\'ordre affiché.'
 
   const status = statusDiv()
@@ -172,13 +172,13 @@ function buildSplit(wrap) {
   row.style.cssText = 'display:flex;gap:8px;align-items:center;'
   const pickBtn = btn('Choisir un PDF', 'fa-solid fa-file-pdf')
   const fileLbl = document.createElement('span')
-  fileLbl.style.cssText = 'flex:1;font-size:11px;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+  fileLbl.style.cssText = 'flex:1;font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
   fileLbl.textContent = 'Aucun fichier'
   row.append(pickBtn, fileLbl)
 
   let pdfPath = null
   const infoLbl = document.createElement('div')
-  infoLbl.style.cssText = 'font-size:11px;color:#888;'
+  infoLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);'
 
   const goBtn = btn('Diviser en pages individuelles', 'fa-solid fa-scissors', true)
   const status = statusDiv()
@@ -216,7 +216,7 @@ function buildRotate(wrap) {
   row.style.cssText = 'display:flex;gap:8px;align-items:center;'
   const pickBtn = btn('Choisir un PDF', 'fa-solid fa-file-pdf')
   const fileLbl = document.createElement('span')
-  fileLbl.style.cssText = 'flex:1;font-size:11px;color:#666;'
+  fileLbl.style.cssText = 'flex:1;font-size:11px;color:var(--text-secondary);'
   fileLbl.textContent = 'Aucun fichier'
   row.append(pickBtn, fileLbl)
 
@@ -226,7 +226,7 @@ function buildRotate(wrap) {
   optRow.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;'
 
   const angleSelect = document.createElement('select')
-  angleSelect.style.cssText = 'background:var(--surface2,#1a1a1a);border:1px solid #333;color:#ddd;border-radius:5px;padding:5px 8px;font-size:12px;'
+  angleSelect.style.cssText = 'background:var(--surface2,#1a1a1a);border:1px solid var(--win-border);color:var(--text-primary);border-radius:5px;padding:5px 8px;font-size:12px;'
   for (const [label, val] of [['90° (horaire)', '90'], ['180°', '180'], ['270° (antihoraire)', '270']]) {
     const opt = document.createElement('option')
     opt.value = val; opt.textContent = label
@@ -235,7 +235,7 @@ function buildRotate(wrap) {
 
   const pageInput = document.createElement('input')
   pageInput.type = 'text'; pageInput.placeholder = 'Pages (ex: 1,3-5 ou vide = toutes)'
-  pageInput.style.cssText = 'flex:1;background:var(--surface2,#1a1a1a);border:1px solid #333;color:#ddd;border-radius:5px;padding:5px 8px;font-size:11px;outline:none;'
+  pageInput.style.cssText = 'flex:1;background:var(--surface2,#1a1a1a);border:1px solid var(--win-border);color:var(--text-primary);border-radius:5px;padding:5px 8px;font-size:11px;outline:none;'
 
   optRow.append(angleSelect, pageInput)
 
@@ -288,19 +288,19 @@ function buildReorder(wrap) {
   row.style.cssText = 'display:flex;gap:8px;align-items:center;'
   const pickBtn = btn('Choisir un PDF', 'fa-solid fa-file-pdf')
   const fileLbl = document.createElement('span')
-  fileLbl.style.cssText = 'flex:1;font-size:11px;color:#666;'
+  fileLbl.style.cssText = 'flex:1;font-size:11px;color:var(--text-secondary);'
   fileLbl.textContent = 'Aucun fichier'
   row.append(pickBtn, fileLbl)
 
   const infoLbl = document.createElement('div')
-  infoLbl.style.cssText = 'font-size:11px;color:#888;'
+  infoLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);'
 
   const orderInput = document.createElement('input')
   orderInput.type = 'text'; orderInput.placeholder = 'Ordre (ex: 3,1,2,4)'
-  orderInput.style.cssText = 'background:var(--surface2,#1a1a1a);border:1px solid #333;color:#ddd;border-radius:5px;padding:6px 10px;font-size:12px;outline:none;width:100%;box-sizing:border-box;'
+  orderInput.style.cssText = 'background:var(--surface2,#1a1a1a);border:1px solid var(--win-border);color:var(--text-primary);border-radius:5px;padding:6px 10px;font-size:12px;outline:none;width:100%;box-sizing:border-box;'
 
   const orderNote = document.createElement('div')
-  orderNote.style.cssText = 'font-size:10px;color:#555;'
+  orderNote.style.cssText = 'font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);'
   orderNote.textContent = 'Entrez les numéros de pages dans le nouvel ordre, séparés par des virgules.'
 
   let pdfPath = null
@@ -341,7 +341,7 @@ function buildReorder(wrap) {
 // ── Tab: Images → PDF ─────────────────────────────────────────────────────────
 function buildImagesToPdf(wrap) {
   const note = document.createElement('div')
-  note.style.cssText = 'font-size:11px;color:#888;'
+  note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
   note.textContent = 'Créez un PDF à partir d\'images (PNG, JPG, GIF, WebP). Chaque image devient une page.'
 
   const list = fileListBox()
@@ -377,14 +377,14 @@ function buildImagesToPdf(wrap) {
 // ── Tab: PDF → Images ─────────────────────────────────────────────────────────
 function buildPdfToImages(wrap) {
   const note = document.createElement('div')
-  note.style.cssText = 'font-size:11px;color:#888;'
+  note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
   note.textContent = 'Convertit chaque page d\'un PDF en image PNG (nécessite LibreOffice).'
 
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:8px;align-items:center;'
   const pickBtn = btn('Choisir un PDF', 'fa-solid fa-file-pdf')
   const fileLbl = document.createElement('span')
-  fileLbl.style.cssText = 'flex:1;font-size:11px;color:#666;'
+  fileLbl.style.cssText = 'flex:1;font-size:11px;color:var(--text-secondary);'
   fileLbl.textContent = 'Aucun fichier'
   row.append(pickBtn, fileLbl)
 
@@ -419,7 +419,7 @@ function buildPdfToImages(wrap) {
 // ── Tab: DOCX/ODT → PDF ───────────────────────────────────────────────────────
 function buildDocToPdf(wrap) {
   const note = document.createElement('div')
-  note.style.cssText = 'font-size:11px;color:#888;'
+  note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
   note.textContent = 'Convertit des documents Word/ODT en PDF via LibreOffice (doit être installé).'
 
   const list = fileListBox()
@@ -462,14 +462,14 @@ function buildDocToPdf(wrap) {
 // ── Tab: PDF → DOCX/ODT ───────────────────────────────────────────────────────
 function buildPdfToDoc(wrap) {
   const note = document.createElement('div')
-  note.style.cssText = 'font-size:11px;color:#888;'
+  note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
   note.textContent = 'Convertit un PDF en document éditable (DOCX ou ODT) via LibreOffice.'
 
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:8px;align-items:center;'
   const pickBtn = btn('Choisir un PDF', 'fa-solid fa-file-pdf')
   const fileLbl = document.createElement('span')
-  fileLbl.style.cssText = 'flex:1;font-size:11px;color:#666;'
+  fileLbl.style.cssText = 'flex:1;font-size:11px;color:var(--text-secondary);'
   fileLbl.textContent = 'Aucun fichier'
   row.append(pickBtn, fileLbl)
 
@@ -478,7 +478,7 @@ function buildPdfToDoc(wrap) {
   const fmtRow = document.createElement('div')
   fmtRow.style.cssText = 'display:flex;gap:8px;align-items:center;'
   const fmtSelect = document.createElement('select')
-  fmtSelect.style.cssText = 'background:var(--surface2,#1a1a1a);border:1px solid #333;color:#ddd;border-radius:5px;padding:5px 8px;font-size:12px;'
+  fmtSelect.style.cssText = 'background:var(--surface2,#1a1a1a);border:1px solid var(--win-border);color:var(--text-primary);border-radius:5px;padding:5px 8px;font-size:12px;'
   for (const [label, val] of [['DOCX (Word)', 'docx'], ['ODT (LibreOffice)', 'odt']]) {
     const opt = document.createElement('option')
     opt.value = val; opt.textContent = label
@@ -545,7 +545,7 @@ export function initPdfTool(body) {
 
   for (const tab of TABS) {
     const tabBtn = document.createElement('button')
-    tabBtn.style.cssText = 'border:none;border-radius:5px;padding:5px 10px;cursor:pointer;font-size:11px;font-family:inherit;background:none;color:#888;display:flex;align-items:center;gap:5px;'
+    tabBtn.style.cssText = 'border:none;border-radius:5px;padding:5px 10px;cursor:pointer;font-size:11px;font-family:inherit;background:none;color:var(--text-secondary);display:flex;align-items:center;gap:5px;'
     tabBtn.innerHTML = `<i class="${tab.icon}"></i> ${tab.label}`
 
     const panel = document.createElement('div')
@@ -556,11 +556,11 @@ export function initPdfTool(body) {
     tabBtn.addEventListener('click', () => {
       if (activeId) {
         panels[activeId].btn.style.background = 'none'
-        panels[activeId].btn.style.color = '#888'
+        panels[activeId].btn.style.color = 'var(--text-secondary)'
         panels[activeId].panel.style.display = 'none'
       }
       activeId = tab.id
-      tabBtn.style.background = 'rgba(255,255,255,0.08)'
+      tabBtn.style.background = 'color-mix(in srgb, var(--text-primary) 8%, transparent)'
       tabBtn.style.color = 'var(--text-primary,#ddd)'
       panel.style.display = 'block'
 

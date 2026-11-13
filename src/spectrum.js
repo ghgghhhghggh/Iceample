@@ -29,36 +29,38 @@ function injectStyles() {
 .sp-palette-btn {
   position: absolute; top: 6px; right: 6px;
   width: 26px; height: 22px; border-radius: 5px;
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.14);
-  color: rgba(255,255,255,0.45); font-size: 11px;
+  /* themed base so it stays legible over any visualiser background */
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
+  color: color-mix(in srgb, var(--text-primary) 45%, transparent); font-size: 11px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; z-index: 10;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .sp-palette-btn:hover {
-  background: rgba(255,255,255,0.14);
-  color: rgba(255,255,255,0.9);
-  border-color: rgba(255,255,255,0.28);
+  background: color-mix(in srgb, var(--surface), var(--text-primary) 8%);
+  color: color-mix(in srgb, var(--text-primary) 90%, transparent);
+  border-color: color-mix(in srgb, var(--text-primary) 28%, transparent);
 }
 .sp-panel {
   position: absolute; top: 34px; right: 6px;
   width: 212px; max-height: 470px;
   overflow-y: auto; overflow-x: hidden;
-  background: rgba(12,12,14,0.97);
-  border: 1px solid rgba(255,255,255,0.14);
+  background: color-mix(in srgb, var(--surface2) 97%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
   border-radius: 9px;
   padding: 10px 12px 14px;
   z-index: 10; backdrop-filter: blur(16px);
   display: flex; flex-direction: column; gap: 8px;
-  scrollbar-width: thin; scrollbar-color: #444 transparent;
+  scrollbar-width: thin; scrollbar-color: var(--win-border) transparent;
 }
 .sp-panel.hidden { display: none; }
 .sp-section-hdr {
   font-size: 9.5px; font-weight: 700; letter-spacing: 0.14em;
-  text-transform: uppercase; color: rgba(150,190,255,0.85);
+  /* same light blue as before on dark themes, darker blue on light ones */
+  text-transform: uppercase; color: color-mix(in srgb, #3672c3 60%, var(--text-primary));
   padding: 7px 0 3px; margin-top: 3px;
-  border-top: 1px solid rgba(255,255,255,0.10);
+  border-top: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
 }
 .sp-section-hdr:first-child { border-top: none; margin-top: 0; padding-top: 0; }
 .sp-row {
@@ -73,27 +75,27 @@ function injectStyles() {
   justify-content: space-between; gap: 8px;
 }
 .sp-label {
-  font-size: 10.5px; color: rgba(255,255,255,0.62);
+  font-size: 10.5px; color: color-mix(in srgb, var(--text-primary) 62%, transparent);
   white-space: nowrap;
 }
 .sp-val {
-  font-size: 10.5px; color: rgba(255,255,255,0.92);
+  font-size: 10.5px; color: color-mix(in srgb, var(--text-primary) 92%, transparent);
   font-variant-numeric: tabular-nums;
 }
 .sp-hint {
   font-size: 9.5px; line-height: 1.45;
-  color: rgba(255,255,255,0.42); padding: 1px 0 2px;
+  color: color-mix(in srgb, var(--text-primary) 42%, transparent); padding: 1px 0 2px;
 }
 .sp-group { display: flex; flex-direction: column; gap: 8px; }
 .sp-range {
   width: 100%; -webkit-appearance: none; appearance: none;
-  height: 3px; background: #2a2a2a; border-radius: 2px;
+  height: 3px; background: var(--win-border); border-radius: 2px;
   outline: none; cursor: pointer; display: block; min-width: 0;
 }
 .sp-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 12px; height: 12px; border-radius: 50%;
-  background: #fff; cursor: pointer;
+  background: var(--text-primary); cursor: pointer;
 }
 .sp-hue-wrap {
   width: 100%; height: 14px; border-radius: 7px;
@@ -103,7 +105,7 @@ function injectStyles() {
     hsl(240,100%,55%),hsl(270,100%,55%),hsl(300,100%,55%),hsl(330,100%,55%),hsl(360,100%,55%)
   );
   position: relative; cursor: pointer;
-  border: 1px solid rgba(255,255,255,0.1); display: block;
+  border: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent); display: block;
 }
 .sp-hue-thumb {
   position: absolute; top: 50%;
@@ -118,7 +120,7 @@ function injectStyles() {
 }
 .sp-color-inp {
   width: 28px; height: 18px;
-  border-radius: 3px; border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 3px; border: 1px solid color-mix(in srgb, var(--text-primary) 18%, transparent);
   padding: 0; cursor: pointer; background: none;
 }
 .sp-mode-row {
@@ -127,17 +129,17 @@ function injectStyles() {
 }
 .sp-mode-btn {
   flex: 1; height: 26px; border-radius: 5px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  color: rgba(255,255,255,0.35); font-size: 11px;
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
+  color: color-mix(in srgb, var(--text-primary) 35%, transparent); font-size: 11px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; transition: all 0.15s;
 }
-.sp-mode-btn:hover { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.8); }
+.sp-mode-btn:hover { background: color-mix(in srgb, var(--text-primary) 10%, transparent); color: color-mix(in srgb, var(--text-primary) 80%, transparent); }
 .sp-mode-btn.active {
-  background: rgba(255,255,255,0.12);
-  border-color: rgba(255,255,255,0.35);
-  color: #fff;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  border-color: color-mix(in srgb, var(--text-primary) 35%, transparent);
+  color: var(--text-primary);
 }
 `
   document.head.appendChild(s)

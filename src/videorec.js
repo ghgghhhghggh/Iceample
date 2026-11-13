@@ -727,7 +727,7 @@ export function initVideoRec(body) {
       volRow.appendChild(volVal)
       const vol = document.createElement('input'); vol.type = 'range'; vol.min = '0'; vol.max = '150'; vol.step = '5'
       vol.value = String(Math.round((music.volume ?? 1) * 100))
-      vol.style.cssText = 'width:calc(100% - 20px);margin:0 10px 4px;accent-color:var(--color-active);'
+      vol.style.cssText = 'width:calc(100% - 20px);margin:0 10px 4px;accent-color:var(--slider-color);'
       vol.addEventListener('input', () => { music.volume = parseInt(vol.value, 10) / 100; volVal.textContent = vol.value + '%' })
       const fadeRow = popRow(t('vr_music_fade'))
       const chk = document.createElement('input'); chk.type = 'checkbox'; chk.checked = !!music.fadeOut
@@ -1227,7 +1227,7 @@ export function initVideoRec(body) {
         valEl.textContent = fmt(val)
         row.appendChild(valEl)
         const inp = document.createElement('input'); inp.type = 'range'; inp.min = String(min); inp.max = String(max); inp.step = String(step); inp.value = String(val)
-        inp.style.cssText = 'width:calc(100% - 20px);margin:0 10px 4px;accent-color:var(--color-active);'
+        inp.style.cssText = 'width:calc(100% - 20px);margin:0 10px 4px;accent-color:var(--slider-color);'
         inp.addEventListener('input', () => { const v = parseFloat(inp.value); valEl.textContent = fmt(v); onChange(v) })
         paramsBox.append(row, inp)
         return inp
@@ -1762,7 +1762,7 @@ export function initVideoRec(body) {
         const simVal = document.createElement('span'); simVal.style.cssText = 'color:var(--text-primary);font-variant-numeric:tabular-nums;'; simVal.textContent = '0.15'
         simRow.appendChild(simVal)
         const sim = document.createElement('input'); sim.type = 'range'; sim.min = '0.01'; sim.max = '0.5'; sim.step = '0.01'; sim.value = '0.15'
-        sim.style.cssText = 'width:calc(100% - 20px);margin:0 10px 4px;accent-color:var(--color-active);'
+        sim.style.cssText = 'width:calc(100% - 20px);margin:0 10px 4px;accent-color:var(--slider-color);'
         sim.addEventListener('input', () => { simVal.textContent = parseFloat(sim.value).toFixed(2) })
         const go = popBtn(t('vc_apply'), 'fa-wand-magic-sparkles')
         go.addEventListener('click', () => finish({ hex: col.value, sim: parseFloat(sim.value) }))

@@ -642,13 +642,13 @@ function injectStyles() {
 .fx-sep{width:1px;height:20px;background:var(--win-border-in);margin:0 2px;flex-shrink:0}
 .fx-main{display:flex;flex:1;overflow:hidden}
 .fx-preview{flex:1;display:flex;align-items:center;justify-content:center;background:
-  repeating-conic-gradient(color-mix(in srgb,var(--surface) 62%,#000) 0% 25%, color-mix(in srgb,var(--surface) 50%,#000) 0% 50%) 0 0/22px 22px;
+  repeating-conic-gradient(color-mix(in srgb,var(--preview-bg),var(--text-primary) 3%) 0% 25%, color-mix(in srgb,var(--preview-bg),var(--text-primary) 1.5%) 0% 50%) 0 0/22px 22px;
   overflow:hidden;position:relative}
-.fx-canvas{max-width:calc(100% - 32px);max-height:calc(100% - 32px);object-fit:contain;display:none;border-radius:8px;box-shadow:0 12px 32px -12px rgba(0,0,0,.65);background:#000}
+.fx-canvas{max-width:calc(100% - 32px);max-height:calc(100% - 32px);object-fit:contain;display:none;border-radius:8px;box-shadow:0 12px 32px -12px rgba(0,0,0,.65);background:var(--preview-bg)}
 .fx-empty-msg{display:flex;flex-direction:column;align-items:center;gap:10px;opacity:.4;pointer-events:none}
 .fx-empty-msg i{font-size:38px}
 .fx-empty-msg span{font-size:12px}
-.fx-panel{width:236px;flex-shrink:0;border-left:1px solid var(--win-border-in);display:flex;flex-direction:column;overflow:hidden;background:color-mix(in srgb,var(--surface) 85%,#000)}
+.fx-panel{width:236px;flex-shrink:0;border-left:1px solid var(--win-border-in);display:flex;flex-direction:column;overflow:hidden;background:var(--surface2)}
 .fx-panel-head{display:flex;align-items:center;justify-content:space-between;padding:8px 11px;border-bottom:1px solid var(--win-border-in)}
 .fx-panel-head span{font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.6px}
 .fx-stack{flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px}
@@ -664,7 +664,7 @@ function injectStyles() {
 .fx-item-body{padding:7px 9px 9px;border-top:1px solid var(--win-border-in);display:flex;flex-direction:column;gap:7px}
 .fx-field{display:flex;flex-direction:column;gap:2px}
 .fx-field label{font-size:10px;color:var(--text-secondary)}
-.fx-field input[type=range]{width:100%;accent-color:var(--color-active)}
+.fx-field input[type=range]{width:100%;accent-color:var(--slider-color)}
 .fx-field input[type=color]{width:36px;height:22px;border:1px solid var(--win-border);border-radius:4px;cursor:pointer;padding:0;background:none}
 .fx-field .fx-val{font-size:10px;color:var(--text-secondary);text-align:right;opacity:.7}
 .fx-row{display:flex;align-items:center;gap:4px}
@@ -680,8 +680,8 @@ function injectStyles() {
 .fx-lib-ov{position:absolute;inset:0;background:var(--surface);display:flex;flex-direction:column;z-index:5}
 .fx-lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px;padding:10px;overflow-y:auto;flex:1}
 .fx-lib-item{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:5px;border-radius:6px;transition:background .1s ease}
-.fx-lib-item:hover{background:rgba(255,255,255,.06)}
-.fx-lib-item img{width:72px;height:72px;object-fit:cover;border-radius:5px;background:color-mix(in srgb,var(--surface) 60%,#000)}
+.fx-lib-item:hover{background:var(--hover)}
+.fx-lib-item img{width:72px;height:72px;object-fit:cover;border-radius:5px;background:var(--preview-bg)}
 .fx-lib-item span{font-size:9px;text-align:center;overflow:hidden;max-width:76px;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)}
 .fx-local{display:flex;flex-direction:column;gap:7px;padding:8px 8px 9px;border-bottom:1px solid var(--win-border-in)}
 .fx-local-toggle{justify-content:center}

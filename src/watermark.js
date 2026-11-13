@@ -41,7 +41,7 @@ export function initWatermark(body) {
   rightArea.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;'
 
   const previewBox = document.createElement('div')
-  previewBox.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;background:#0a0a0a;overflow:hidden;position:relative;'
+  previewBox.style.cssText = 'flex:1;display:flex;align-items:center;justify-content:center;background:var(--preview-bg);overflow:hidden;position:relative;'
 
   const bottomBar = document.createElement('div')
   bottomBar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--win-border-in,#1e1e1e);flex-shrink:0;background:var(--surface2,#141414);'
@@ -56,16 +56,16 @@ export function initWatermark(body) {
   const ctx = canvas.getContext('2d')
 
   const dropHint = document.createElement('div')
-  dropHint.style.cssText = 'color:#444;text-align:center;pointer-events:none;'
-  dropHint.innerHTML = '<i class="fa-solid fa-image" style="font-size:40px;display:block;margin-bottom:8px;"></i>Glissez une image ou vidéo ici<br><span style="font-size:10px;color:#333;">PNG · JPG · WEBP · MP4 · MOV · MKV · AVI · WEBM</span>'
+  dropHint.style.cssText = 'color:color-mix(in srgb, var(--text-secondary) 65%, transparent);text-align:center;pointer-events:none;'
+  dropHint.innerHTML = '<i class="fa-solid fa-image" style="font-size:40px;display:block;margin-bottom:8px;"></i>Glissez une image ou vidéo ici<br><span style="font-size:10px;color:color-mix(in srgb, var(--text-secondary) 50%, transparent);">PNG · JPG · WEBP · MP4 · MOV · MKV · AVI · WEBM</span>'
 
   previewBox.append(dropHint, canvas)
 
   // ── Drop zone ──────────────────────────────────────────────────────────────
-  previewBox.addEventListener('dragover', e => { e.preventDefault(); previewBox.style.background = '#111d2a' })
-  previewBox.addEventListener('dragleave', () => { previewBox.style.background = '#0a0a0a' })
+  previewBox.addEventListener('dragover', e => { e.preventDefault(); previewBox.style.background = 'color-mix(in srgb, var(--color-active) 12%, var(--preview-bg))' })
+  previewBox.addEventListener('dragleave', () => { previewBox.style.background = 'var(--preview-bg)' })
   previewBox.addEventListener('drop', async e => {
-    e.preventDefault(); previewBox.style.background = '#0a0a0a'
+    e.preventDefault(); previewBox.style.background = 'var(--preview-bg)'
     const file = e.dataTransfer?.files?.[0]; if (!file) return
     await loadMedia(file.path || null, file.name)
   })
@@ -76,18 +76,18 @@ export function initWatermark(body) {
 
   function pLabel(txt) {
     const d = document.createElement('div')
-    d.style.cssText = 'font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;'
+    d.style.cssText = 'font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;'
     d.textContent = txt; return d
   }
 
   function rangeCtrl(key, labelText, min, max, step, decimals = 0) {
     const wrap = document.createElement('div'); wrap.style.cssText = 'display:flex;flex-direction:column;gap:2px;'
-    const row = document.createElement('div'); row.style.cssText = 'display:flex;justify-content:space-between;font-size:11px;color:#aaa;'
+    const row = document.createElement('div'); row.style.cssText = 'display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary);'
     const lbl = document.createElement('span'); lbl.textContent = labelText
-    const val = document.createElement('span'); val.style.cssText = 'color:#ddd;font-weight:500;'; val.textContent = state[key].toFixed(decimals)
+    const val = document.createElement('span'); val.style.cssText = 'color:var(--text-primary);font-weight:500;'; val.textContent = state[key].toFixed(decimals)
     row.append(lbl, val)
     const inp = document.createElement('input'); inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = state[key]
-    inp.style.cssText = 'width:100%;accent-color:var(--color-active,#4a9eff);'
+    inp.style.cssText = 'width:100%;accent-color:var(--slider-color);'
     inp.addEventListener('input', () => { state[key] = parseFloat(inp.value); val.textContent = state[key].toFixed(decimals); updatePreview() })
     wrap.append(row, inp); leftPanel.appendChild(wrap)
     return inp
@@ -97,11 +97,11 @@ export function initWatermark(body) {
   leftPanel.appendChild(pLabel('Fichier source'))
   const pickMediaBtn = document.createElement('button')
   pickMediaBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i> Ouvrir image/vidéo'
-  pickMediaBtn.style.cssText = 'border:1px solid var(--win-border-in,#1e1e1e);border-radius:5px;padding:6px;cursor:pointer;font-size:11px;font-family:inherit;background:var(--surface,#111);color:#ddd;width:100%;'
+  pickMediaBtn.style.cssText = 'border:1px solid var(--win-border-in,#1e1e1e);border-radius:5px;padding:6px;cursor:pointer;font-size:11px;font-family:inherit;background:var(--surface,#111);color:var(--text-primary);width:100%;'
   leftPanel.appendChild(pickMediaBtn)
 
   const mediaNameLbl = document.createElement('div')
-  mediaNameLbl.style.cssText = 'font-size:10px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
+  mediaNameLbl.style.cssText = 'font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'
   leftPanel.appendChild(mediaNameLbl)
 
   pickMediaBtn.addEventListener('click', async () => {
@@ -125,7 +125,7 @@ export function initWatermark(body) {
   for (const [id, txt] of [['text','Texte'],['image','Image']]) {
     const b = document.createElement('button')
     b.textContent = txt; b.dataset.mode = id
-    b.style.cssText = 'flex:1;border-radius:5px;padding:5px;cursor:pointer;font-size:11px;font-family:inherit;border:1px solid var(--win-border-in,#1e1e1e);background:var(--surface,#111);color:#aaa;'
+    b.style.cssText = 'flex:1;border-radius:5px;padding:5px;cursor:pointer;font-size:11px;font-family:inherit;border:1px solid var(--win-border-in,#1e1e1e);background:var(--surface,#111);color:var(--text-secondary);'
     b.addEventListener('click', () => { state.mode = id; updateModeUI(); updatePreview() })
     modeRow.appendChild(b)
   }
@@ -138,19 +138,19 @@ export function initWatermark(body) {
   textInp.addEventListener('input', () => { state.wmText = textInp.value; updatePreview() })
   textGroup.appendChild(textInp)
 
-  const fontLabel = document.createElement('div'); fontLabel.style.cssText = 'display:flex;justify-content:space-between;font-size:11px;color:#aaa;'
+  const fontLabel = document.createElement('div'); fontLabel.style.cssText = 'display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary);'
   const fLbl = document.createElement('span'); fLbl.textContent = 'Taille police'
-  const fVal = document.createElement('span'); fVal.style.cssText = 'color:#ddd;font-weight:500;'; fVal.textContent = state.wmFont
+  const fVal = document.createElement('span'); fVal.style.cssText = 'color:var(--text-primary);font-weight:500;'; fVal.textContent = state.wmFont
   fontLabel.append(fLbl, fVal)
   const fontRange = document.createElement('input'); fontRange.type = 'range'; fontRange.min = 10; fontRange.max = 120; fontRange.step = 2; fontRange.value = state.wmFont
-  fontRange.style.cssText = 'width:100%;accent-color:var(--color-active,#4a9eff);'
+  fontRange.style.cssText = 'width:100%;accent-color:var(--slider-color);'
   fontRange.addEventListener('input', () => { state.wmFont = fontRange.value; fVal.textContent = fontRange.value; updatePreview() })
   textGroup.append(fontLabel, fontRange)
 
   const colorRow2 = document.createElement('div'); colorRow2.style.cssText = 'display:flex;align-items:center;gap:8px;'
-  const cLbl = document.createElement('span'); cLbl.style.cssText = 'font-size:11px;color:#aaa;flex:1;'; cLbl.textContent = 'Couleur'
+  const cLbl = document.createElement('span'); cLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;'; cLbl.textContent = 'Couleur'
   const colorInp = document.createElement('input'); colorInp.type = 'color'; colorInp.value = state.wmColor
-  colorInp.style.cssText = 'width:40px;height:24px;border:1px solid #444;border-radius:4px;padding:1px;cursor:pointer;background:none;'
+  colorInp.style.cssText = 'width:40px;height:24px;border:1px solid var(--win-border);border-radius:4px;padding:1px;cursor:pointer;background:none;'
   colorInp.addEventListener('input', () => { state.wmColor = colorInp.value; updatePreview() })
   colorRow2.append(cLbl, colorInp)
   textGroup.appendChild(colorRow2)
@@ -161,7 +161,7 @@ export function initWatermark(body) {
   imgGroup.appendChild(pLabel('Image du filigrane'))
   const pickWmImgBtn = document.createElement('button')
   pickWmImgBtn.innerHTML = '<i class="fa-solid fa-image"></i> Choisir image'
-  pickWmImgBtn.style.cssText = 'border:1px solid var(--win-border-in,#1e1e1e);border-radius:5px;padding:5px;cursor:pointer;font-size:11px;font-family:inherit;background:var(--surface,#111);color:#ddd;width:100%;'
+  pickWmImgBtn.style.cssText = 'border:1px solid var(--win-border-in,#1e1e1e);border-radius:5px;padding:5px;cursor:pointer;font-size:11px;font-family:inherit;background:var(--surface,#111);color:var(--text-primary);width:100%;'
   pickWmImgBtn.addEventListener('click', async () => {
     if (!window.__TAURI__) return
     const result = await window.__TAURI__.core.invoke('pick_files_with_filter', {
@@ -174,15 +174,15 @@ export function initWatermark(body) {
     wmImgLabel.textContent = state.wmImgPath.split(/[\\/]/).pop()
     updatePreview()
   })
-  const wmImgLabel = document.createElement('div'); wmImgLabel.style.cssText = 'font-size:10px;color:#555;'
+  const wmImgLabel = document.createElement('div'); wmImgLabel.style.cssText = 'font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);'
   imgGroup.append(pickWmImgBtn, wmImgLabel)
 
-  const iwLabel = document.createElement('div'); iwLabel.style.cssText = 'display:flex;justify-content:space-between;font-size:11px;color:#aaa;'
+  const iwLabel = document.createElement('div'); iwLabel.style.cssText = 'display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary);'
   const iwLbl = document.createElement('span'); iwLbl.textContent = 'Largeur (px)'
-  const iwVal = document.createElement('span'); iwVal.style.cssText = 'color:#ddd;font-weight:500;'; iwVal.textContent = state.wmImgW
+  const iwVal = document.createElement('span'); iwVal.style.cssText = 'color:var(--text-primary);font-weight:500;'; iwVal.textContent = state.wmImgW
   iwLabel.append(iwLbl, iwVal)
   const iwRange = document.createElement('input'); iwRange.type = 'range'; iwRange.min = 20; iwRange.max = 600; iwRange.step = 10; iwRange.value = state.wmImgW
-  iwRange.style.cssText = 'width:100%;accent-color:var(--color-active,#4a9eff);'
+  iwRange.style.cssText = 'width:100%;accent-color:var(--slider-color);'
   iwRange.addEventListener('input', () => { state.wmImgW = parseInt(iwRange.value); iwVal.textContent = iwRange.value; updatePreview() })
   imgGroup.append(iwLabel, iwRange)
   leftPanel.appendChild(imgGroup)
@@ -196,7 +196,7 @@ export function initWatermark(body) {
   posGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:3px;'
   for (const [pos, lbl] of POSITIONS) {
     const b = document.createElement('button')
-    b.style.cssText = 'border:1px solid var(--win-border-in,#1e1e1e);border-radius:4px;padding:4px 2px;cursor:pointer;font-size:9px;font-family:inherit;background:var(--surface,#111);color:#aaa;text-align:center;'
+    b.style.cssText = 'border:1px solid var(--win-border-in,#1e1e1e);border-radius:4px;padding:4px 2px;cursor:pointer;font-size:9px;font-family:inherit;background:var(--surface,#111);color:var(--text-secondary);text-align:center;'
     b.textContent = lbl; b.dataset.pos = pos
     b.addEventListener('click', () => { state.wmPos = pos; updatePosUI(); updatePreview() })
     posGrid.appendChild(b)
@@ -212,7 +212,7 @@ export function initWatermark(body) {
     for (const b of modeRow.children) {
       const active = b.dataset.mode === state.mode
       b.style.background = active ? 'var(--color-active,#4a9eff)' : 'var(--surface,#111)'
-      b.style.color = active ? '#fff' : '#aaa'
+      b.style.color = active ? 'var(--on-accent)' : 'var(--text-secondary)'
     }
     textGroup.style.display = state.mode === 'text' ? 'flex' : 'none'
     imgGroup.style.display  = state.mode === 'image' ? 'flex' : 'none'
@@ -222,7 +222,7 @@ export function initWatermark(body) {
     for (const b of posGrid.children) {
       const active = b.dataset.pos === state.wmPos
       b.style.background = active ? 'var(--color-active,#4a9eff)' : 'var(--surface,#111)'
-      b.style.color = active ? '#fff' : '#aaa'
+      b.style.color = active ? 'var(--on-accent)' : 'var(--text-secondary)'
       b.style.border = active ? '1px solid var(--color-active,#4a9eff)' : '1px solid var(--win-border-in,#1e1e1e)'
     }
   }
@@ -258,8 +258,8 @@ export function initWatermark(body) {
       dropHint.style.display = 'none'
       canvas.style.display = 'none'
       const vidInfo = document.createElement('div')
-      vidInfo.style.cssText = 'color:#888;font-size:11px;text-align:center;padding:12px;'
-      vidInfo.innerHTML = `<i class="fa-solid fa-film" style="font-size:32px;display:block;margin-bottom:8px;color:#555;"></i>${state.mediaName}<br><span style="font-size:10px;color:#444;">Aperçu non disponible pour les vidéos.<br>Cliquez sur Appliquer pour traiter.</span>`
+      vidInfo.style.cssText = 'color:var(--text-secondary);font-size:11px;text-align:center;padding:12px;'
+      vidInfo.innerHTML = `<i class="fa-solid fa-film" style="font-size:32px;display:block;margin-bottom:8px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);"></i>${state.mediaName}<br><span style="font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);">Aperçu non disponible pour les vidéos.<br>Cliquez sur Appliquer pour traiter.</span>`
       // clear old vid info
       for (const el of previewBox.querySelectorAll('.vid-info')) el.remove()
       vidInfo.className = 'vid-info'
@@ -351,20 +351,20 @@ export function initWatermark(body) {
   const BTN2 = (txt, icon, col) => {
     const b = document.createElement('button')
     b.innerHTML = `<i class="fa-solid ${icon}"></i> ${txt}`
-    b.style.cssText = `border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:11px;font-family:inherit;background:${col};color:#fff;`
+    b.style.cssText = `border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:11px;font-family:inherit;background:${col};color:var(--on-accent);`
     return b
   }
 
-  const applyBtn   = BTN2('Appliquer et sauvegarder', 'fa-wand-magic-sparkles', 'var(--color-active,#4a9eff)')
+  const applyBtn   = BTN2('Appliquer et sauvegarder', 'fa-wand-magic-sparkles', 'var(--btn-primary)')
   const statusLbl  = document.createElement('span')
-  statusLbl.style.cssText = 'font-size:10px;color:#666;margin-left:auto;'
+  statusLbl.style.cssText = 'font-size:10px;color:var(--text-secondary);margin-left:auto;'
   // "Send to…" — ship the watermarked result (preview canvas is full-res).
   const sendBtn = makeSendButton(async () => {
     if (!baseImageEl || state.mediaType !== 'image') return null
     await updatePreview()
     return imageMedia(canvas, (state.mediaName || 'filigrane').replace(/\.[^.]+$/, ''))
   }, { self: 'watermark', className: '', iconOnly: true })
-  sendBtn.style.cssText = 'border:1px solid var(--win-border-in,#1e1e1e);border-radius:6px;padding:7px 10px;cursor:pointer;font-size:11px;font-family:inherit;background:var(--surface,#111);color:#ddd;'
+  sendBtn.style.cssText = 'border:1px solid var(--win-border-in,#1e1e1e);border-radius:6px;padding:7px 10px;cursor:pointer;font-size:11px;font-family:inherit;background:var(--surface,#111);color:var(--text-primary);'
   bottomBar.append(applyBtn, sendBtn, statusLbl)
 
   applyBtn.addEventListener('click', async () => {

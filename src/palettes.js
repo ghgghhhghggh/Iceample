@@ -31,10 +31,10 @@ export function showPalPicker(anchor, onPick) {
     const showPal = (pal, btn) => {
       right.innerHTML = ''
       left.querySelectorAll('button').forEach(b => { b.style.background = 'none'; b.style.color = 'var(--text-secondary)' })
-      btn.style.background = 'rgba(255,255,255,.07)'; btn.style.color = 'var(--text-primary)'
+      btn.style.background = 'color-mix(in srgb, var(--text-primary) 7%, transparent)'; btn.style.color = 'var(--text-primary)'
       pal.colors.forEach(c => {
         const s = document.createElement('button')
-        s.title = c; s.style.cssText = `width:18px;height:18px;border-radius:4px;border:1px solid rgba(255,255,255,.14);background:${c};cursor:pointer;padding:0;flex-shrink:0`
+        s.title = c; s.style.cssText = `width:18px;height:18px;border-radius:4px;border:1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);background:${c};cursor:pointer;padding:0;flex-shrink:0`
         s.addEventListener('click', e => { e.stopPropagation(); onPick(c); close() })
         right.appendChild(s)
       })
@@ -74,15 +74,15 @@ function injectStyles() {
 .pal-card-h .nm { flex:1; font-size:12px; font-weight:600; color:var(--text-primary,#eee); cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .pal-card-h .act { opacity:.5; cursor:pointer; font-size:12px; }
 .pal-card-h .act:hover { opacity:1; }
-.pal-card-h .act.del:hover { color:#ff6a6a; }
+.pal-card-h .act.del:hover { color:var(--danger); }
 .pal-swatches { display:flex; flex-wrap:wrap; gap:6px; }
-.pal-sw { width:34px; height:34px; border-radius:7px; border:1px solid rgba(255,255,255,.14); cursor:pointer; position:relative; transition:transform .1s; }
+.pal-sw { width:34px; height:34px; border-radius:7px; border:1px solid color-mix(in srgb, var(--text-primary) 14%, transparent); cursor:pointer; position:relative; transition:transform .1s; }
 .pal-sw:hover { transform:scale(1.08); }
-.pal-sw .x { position:absolute; top:-5px; right:-5px; width:15px; height:15px; border-radius:50%; background:#222; color:#fff; font-size:9px; display:none; align-items:center; justify-content:center; border:1px solid #444; }
+.pal-sw .x { position:absolute; top:-5px; right:-5px; width:15px; height:15px; border-radius:50%; background:var(--surface2); color:var(--text-primary); font-size:9px; display:none; align-items:center; justify-content:center; border:1px solid var(--win-border); }
 .pal-sw:hover .x { display:flex; }
-.pal-sw .e { position:absolute; top:-5px; left:-5px; width:15px; height:15px; border-radius:50%; background:#222; color:#fff; font-size:7px; display:none; align-items:center; justify-content:center; border:1px solid #444; }
+.pal-sw .e { position:absolute; top:-5px; left:-5px; width:15px; height:15px; border-radius:50%; background:var(--surface2); color:var(--text-primary); font-size:7px; display:none; align-items:center; justify-content:center; border:1px solid var(--win-border); }
 .pal-sw:hover .e { display:flex; }
-.pal-sw .rp { position:absolute; bottom:-5px; left:-5px; width:15px; height:15px; border-radius:50%; background:#222; color:#fff; font-size:7px; display:none; align-items:center; justify-content:center; border:1px solid #444; }
+.pal-sw .rp { position:absolute; bottom:-5px; left:-5px; width:15px; height:15px; border-radius:50%; background:var(--surface2); color:var(--text-primary); font-size:7px; display:none; align-items:center; justify-content:center; border:1px solid var(--win-border); }
 .pal-sw:hover .rp { display:flex; }
 .pal-contrast { border-bottom:1px solid var(--win-border-in,#1e1e1e); flex-shrink:0; }
 .pal-contrast-h { display:flex; align-items:center; gap:7px; padding:7px 12px; cursor:pointer; font-size:11px; color:var(--text-secondary,#aaa); user-select:none; }
@@ -95,7 +95,7 @@ function injectStyles() {
 .pal-badge { font-size:9px; padding:2px 7px; border-radius:99px; border:1px solid transparent; font-weight:600; }
 .pal-contrast-ratio { font-size:15px; font-weight:700; color:var(--text-primary,#eee); }
 .pal-contrast-hint { font-size:10px; color:var(--text-secondary,#5f6068); font-style:italic; }
-.pal-add { width:34px; height:34px; border-radius:7px; border:1px dashed var(--win-border,#3a3a3a); background:none; color:#888; cursor:pointer; font-size:14px; }
+.pal-add { width:34px; height:34px; border-radius:7px; border:1px dashed var(--win-border,#3a3a3a); background:none; color:var(--text-secondary); cursor:pointer; font-size:14px; }
 .pal-add:hover { color:var(--color-active,#4a9eff); border-color:var(--color-active,#4a9eff); }
 .pal-hex { width:72px; height:34px; border-radius:7px; border:1px dashed var(--win-border,#3a3a3a); background:none; color:var(--text-primary,#eee); font-family:inherit; font-size:10px; text-align:center; outline:none; padding:0 4px; }
 .pal-hex::placeholder { color:var(--text-secondary,#5f6068); }
@@ -224,7 +224,7 @@ export function initPalettes(body) {
         if (ic.dataset.arm) { palettes.splice(pi, 1); persist(); render(); return }
         ic.dataset.arm = '1'
         ic.classList.replace('fa-xmark', 'fa-check')
-        ic.style.color = '#ff6a6a'; ic.style.opacity = '1'
+        ic.style.color = 'var(--danger)'; ic.style.opacity = '1'
         setTimeout(() => {
           if (!ic.isConnected || !ic.dataset.arm) return
           delete ic.dataset.arm
@@ -273,7 +273,7 @@ export function initPalettes(body) {
           cols.push('#' + hh)
         })
         if (cols.length) { pal.colors.push(...cols); persist(); render() }
-        else if (toks.length) { hexInp.style.borderColor = '#ff6a6a'; setTimeout(() => { hexInp.style.borderColor = '' }, 700) }
+        else if (toks.length) { hexInp.style.borderColor = 'var(--danger)'; setTimeout(() => { hexInp.style.borderColor = '' }, 700) }
       })
       sw.append(add, hexInp, ci); card.appendChild(sw); list.appendChild(card)
     })
@@ -329,7 +329,7 @@ export function initPalettes(body) {
       const b = document.createElement('button')
       b.textContent = lbl
       b.style.cssText = 'text-align:left;padding:5px 14px;border:none;border-radius:4px;background:none;color:var(--text-secondary);font-size:11px;cursor:pointer;font-family:inherit;white-space:nowrap'
-      b.addEventListener('mouseenter', () => { b.style.background = 'rgba(255,255,255,.07)'; b.style.color = 'var(--text-primary)' })
+      b.addEventListener('mouseenter', () => { b.style.background = 'color-mix(in srgb, var(--text-primary) 7%, transparent)'; b.style.color = 'var(--text-primary)' })
       b.addEventListener('mouseleave', () => { b.style.background = 'none'; b.style.color = 'var(--text-secondary)' })
       b.addEventListener('click', e => { e.stopPropagation(); copyOut(make()) })
       pop.appendChild(b)

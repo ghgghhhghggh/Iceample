@@ -662,7 +662,7 @@ export function initSequencer(body) {
     const name = saveNameInp.value.trim() || t('seq_default_name')
     const root = localStorage.getItem('library:root')
     if (!root || !window.__TAURI__) {
-      btnSave.style.color = '#ff5f5f'
+      btnSave.style.color = 'var(--danger)'
       setTimeout(() => { btnSave.style.color = '' }, 1500)
       return
     }
@@ -714,7 +714,7 @@ export function initSequencer(body) {
     } catch (err) {
       console.error('[SAVE]', err)
       btnSave.innerHTML = '<i class="fa-solid fa-xmark"></i>'
-      btnSave.style.color = '#ff5f5f'
+      btnSave.style.color = 'var(--danger)'
       setTimeout(() => { btnSave.innerHTML = '<i class="fa-solid fa-floppy-disk"></i>'; btnSave.style.color = '' }, 1500)
     }
   }

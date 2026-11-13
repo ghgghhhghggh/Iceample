@@ -47,7 +47,7 @@ export function maybeShowOnboarding() {
   skipBtn.textContent = t('ob_skip')
   skipBtn.style.cssText = 'border:1px solid var(--win-border);background:none;color:var(--text-secondary);border-radius:7px;padding:7px 14px;font-size:11px;font-family:inherit;cursor:pointer'
   const nextBtn = document.createElement('button')
-  nextBtn.style.cssText = 'border:none;background:var(--color-active);color:#fff;border-radius:7px;padding:7px 18px;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer'
+  nextBtn.style.cssText = 'border:none;background:var(--btn-primary);color:var(--on-accent);border-radius:7px;padding:7px 18px;font-size:11px;font-weight:600;font-family:inherit;cursor:pointer'
   row.append(skipBtn, nextBtn)
 
   card.append(icon, title, text, dots, row)

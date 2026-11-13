@@ -108,7 +108,7 @@ export function initPatterns(body) {
 
   const exportSvgBtn = document.createElement('button')
   exportSvgBtn.innerHTML = '<i class="fa-solid fa-code"></i> SVG'
-  exportSvgBtn.style.cssText = BTN + 'background:var(--color-active,#4a9eff);border:none;color:#fff;margin-left:auto;'
+  exportSvgBtn.style.cssText = BTN + 'background:var(--btn-primary);border:none;color:var(--on-accent);margin-left:auto;'
 
   // "Send to…" — ship the pattern (WYSIWYG scale, export size) to another tool.
   const sendBtn = makeSendButton(() => {
@@ -161,7 +161,7 @@ export function initPatterns(body) {
     const val = document.createElement('span'); val.style.cssText = 'color:var(--text-primary,#ddd);font-weight:500;'; val.textContent = state[key].toFixed(decimals)
     row.append(lbl, val)
     const inp = document.createElement('input'); inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = state[key]
-    inp.style.cssText = 'width:100%;accent-color:var(--color-active,#4a9eff);'
+    inp.style.cssText = 'width:100%;accent-color:var(--slider-color);'
     inp.addEventListener('input', () => { state[key] = parseFloat(inp.value); val.textContent = state[key].toFixed(decimals); render(); saveState() })
     wrap.append(row, inp); panel.appendChild(wrap)
     widgetSync.push(() => { inp.value = state[key]; val.textContent = state[key].toFixed(decimals) })
@@ -252,7 +252,7 @@ export function initPatterns(body) {
   rangeCtrl('opacity1',t('pat_opacity'),0.1,   1, 0.05, 2)
 
   // Transparent background (checkerboard shown behind the preview canvas)
-  const CHECKER = 'repeating-conic-gradient(rgba(255,255,255,.13) 0% 25%, rgba(255,255,255,.045) 0% 50%) 0 0 / 16px 16px'
+  const CHECKER = 'repeating-conic-gradient(color-mix(in srgb,var(--text-primary) 13%,transparent) 0% 25%, color-mix(in srgb,var(--text-primary) 4.5%,transparent) 0% 50%) 0 0 / 16px 16px'
   const updateChecker = () => { canvas.style.background = state.transparent ? CHECKER : 'none' }
   const trWrap = document.createElement('label')
   trWrap.style.cssText = 'display:flex;align-items:center;gap:7px;font-size:11px;color:var(--text-secondary,#aaa);cursor:pointer;'

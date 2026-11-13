@@ -6,6 +6,7 @@ import { t } from './i18n.js'
 import { showPalPicker } from './palettes.js'
 import { promptName } from './rename-dialog.js'
 import { registerCommands, unregisterCommandsBy } from './commands.js'
+import { themeColor } from './theme.js'
 
 const LS_KEY = 'iceample:moodboards'
 const MIN = 40
@@ -81,7 +82,7 @@ function injectStyles() {
 .mb2-new-card i { font-size:20px; }
 
 /* Exclusive full-screen board mode — its own animated fond, blocks everything else */
-#mb-board-layer { position:fixed; inset:0; z-index:9000; overflow:hidden; background:color-mix(in srgb, var(--surface) 60%, #000); }
+#mb-board-layer { position:fixed; inset:0; z-index:9000; overflow:hidden; background:var(--preview-bg); }
 #mb-board-layer::before { content:''; position:absolute; inset:-35%; pointer-events:none; z-index:0;
   background:
     radial-gradient(42% 42% at 30% 35%, color-mix(in srgb, var(--color-active,#4a9eff) 16%, transparent), transparent 70%),
@@ -110,10 +111,10 @@ html.reduce-motion #mb-board-layer::before { animation:none; }
 .mb2-item.mb2-textitem.bordered { border:1px solid var(--win-border,#2a2a2a); box-shadow:0 4px 16px rgba(0,0,0,0.45); }
 #mb2-itemmenu { position:fixed; z-index:9002; background:var(--surface,#141414); border:1px solid var(--win-border,#2a2a2a);
   border-radius:8px; padding:4px; box-shadow:0 10px 28px rgba(0,0,0,0.55); }
-.mb2-item-x { position:absolute; top:-9px; right:-9px; width:18px; height:18px; border:none; border-radius:50%; background:color-mix(in srgb, var(--surface) 60%, #000);
-  color:#fff; font-size:10px; cursor:pointer; opacity:0; transition:opacity .1s; z-index:3; box-shadow:0 1px 4px rgba(0,0,0,.5); }
+.mb2-item-x { position:absolute; top:-9px; right:-9px; width:18px; height:18px; border:none; border-radius:50%; background:var(--surface2);
+  color:var(--text-primary); font-size:10px; cursor:pointer; opacity:0; transition:opacity .1s; z-index:3; box-shadow:0 1px 4px rgba(0,0,0,.5); }
 .mb2-item:hover .mb2-item-x { opacity:1; }
-.mb2-h { position:absolute; width:11px; height:11px; background:var(--color-active,#4a9eff); border:1px solid #fff;
+.mb2-h { position:absolute; width:11px; height:11px; background:var(--color-active,#4a9eff); border:1px solid var(--on-accent);
   border-radius:2px; opacity:0; transition:opacity .1s; z-index:4; }
 .mb2-item:hover .mb2-h { opacity:0.95; }
 .mb2-h-n  { top:-6px;  left:50%;  transform:translateX(-50%); cursor:ns-resize; }
@@ -125,7 +126,7 @@ html.reduce-motion #mb-board-layer::before { animation:none; }
 .mb2-h-se { bottom:-6px; right:-6px; cursor:nwse-resize; }
 .mb2-h-sw { bottom:-6px; left:-6px;  cursor:nesw-resize; }
 .mb2-rot { position:absolute; top:-26px; left:50%; transform:translateX(-50%); width:12px; height:12px; border-radius:50%;
-  background:var(--color-active,#4a9eff); border:1px solid #fff; cursor:grab; opacity:0; transition:opacity .1s; z-index:4; box-shadow:0 1px 4px rgba(0,0,0,.5); }
+  background:var(--color-active,#4a9eff); border:1px solid var(--on-accent); cursor:grab; opacity:0; transition:opacity .1s; z-index:4; box-shadow:0 1px 4px rgba(0,0,0,.5); }
 .mb2-item:hover .mb2-rot { opacity:0.95; }
   `
   document.head.appendChild(s)
@@ -346,7 +347,9 @@ export function enterBoard(board) {
   board.items.forEach(d => mountItem(layer, board, d))
 
   // ── Add helpers ─────────────────────────────────────────────────────────────
-  let brushColor = '#ffffff', brushSize = 6, brushOn = false, erasing = false
+  // Default ink = the theme's text colour (white on dark themes, dark on light
+  // ones), so new text and strokes are visible on the board until a colour is picked.
+  let brushColor = themeColor('--text-primary'), brushSize = 6, brushOn = false, erasing = false
   function placeXY(x, y) {
     const n = board.items.length
     return { x: x != null ? Math.max(0, x) : 40 + (n * 26) % Math.max(40, layer.clientWidth - 260),
@@ -411,7 +414,7 @@ export function enterBoard(board) {
     <button class="mb2-btn" id="mbb-text"><i class="fa-solid fa-font"></i> ${t('mb_text')}</button>
     <button class="mb2-btn" id="mbb-brush"><i class="fa-solid fa-paintbrush"></i> ${t('mb_brush')}</button>
     <button class="mb2-btn" id="mbb-erase"><i class="fa-solid fa-eraser"></i> ${t('mb_eraser')}</button>
-    <input class="mb2-color" id="mbb-color" type="color" value="#ffffff" />
+    <input class="mb2-color" id="mbb-color" type="color" value="${brushColor}" />
     <input class="mb2-range" id="mbb-size" type="range" min="1" max="32" value="6" />
     <input class="mb2-link" id="mbb-link" type="text" placeholder="${t('mb_link_placeholder')}" />
     <span class="mb2-sep"></span>
@@ -615,7 +618,7 @@ export function initMoodboard(body) {
         if (!xBtn.dataset.arm) {
           xBtn.dataset.arm = '1'
           xBtn.innerHTML = '<i class="fa-solid fa-check"></i>'
-          xBtn.style.background = '#c0392b'; xBtn.style.opacity = '1'
+          xBtn.style.background = 'var(--danger)'; xBtn.style.opacity = '1'
           setTimeout(() => {
             if (!xBtn.isConnected || !xBtn.dataset.arm) return
             delete xBtn.dataset.arm

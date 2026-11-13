@@ -70,7 +70,7 @@ export function initMetadata(body) {
 
   const BTN  = 'border:none;border-radius:5px;padding:6px 12px;cursor:pointer;font-size:11px;font-family:inherit;'
   const INP  = 'background:var(--surface2,#1a1a1a);border:1px solid var(--win-border-in,#1e1e1e);color:var(--text-primary,#ddd);border-radius:5px;padding:5px 8px;font-size:12px;outline:none;width:100%;box-sizing:border-box;'
-  const LBL  = 'color:#888;font-size:11px;margin-bottom:3px;display:block;'
+  const LBL  = 'color:var(--text-secondary);font-size:11px;margin-bottom:3px;display:block;'
 
   // ── Header ──────────────────────────────────────────────────────────────────
   const header = document.createElement('div')
@@ -78,22 +78,22 @@ export function initMetadata(body) {
 
   const pickBtn = document.createElement('button')
   pickBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i> Ouvrir'
-  pickBtn.style.cssText = BTN + 'background:var(--color-active,#4a9eff);color:#fff;'
+  pickBtn.style.cssText = BTN + 'background:var(--btn-primary);color:var(--on-accent);'
 
   const fileLbl = document.createElement('span')
-  fileLbl.style.cssText = 'flex:1;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;'
+  fileLbl.style.cssText = 'flex:1;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;'
   fileLbl.textContent = 'Aucun fichier sélectionné'
 
   const saveBtn = document.createElement('button')
   saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Enregistrer'
-  saveBtn.style.cssText = BTN + 'background:#2a2a2a;border:1px solid #444;color:#ddd;'
+  saveBtn.style.cssText = BTN + 'background:var(--surface2);border:1px solid var(--win-border);color:var(--text-primary);'
   saveBtn.disabled = true
 
   header.append(pickBtn, fileLbl, saveBtn)
 
   // ── Info bar ─────────────────────────────────────────────────────────────────
   const infoBar = document.createElement('div')
-  infoBar.style.cssText = 'display:flex;gap:16px;padding:5px 12px;background:var(--surface2,#1a1a1a);border-bottom:1px solid var(--win-border-in,#1e1e1e);color:#555;font-size:10px;flex-shrink:0;'
+  infoBar.style.cssText = 'display:flex;gap:16px;padding:5px 12px;background:var(--surface2,#1a1a1a);border-bottom:1px solid var(--win-border-in,#1e1e1e);color:color-mix(in srgb, var(--text-secondary) 65%, transparent);font-size:10px;flex-shrink:0;'
   infoBar.innerHTML = '—'
 
   // ── Content ──────────────────────────────────────────────────────────────────
@@ -105,21 +105,21 @@ export function initMetadata(body) {
   artWrap.style.cssText = 'width:172px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;padding:14px 12px;gap:8px;border-right:1px solid var(--win-border-in,#1e1e1e);'
 
   const artImg = document.createElement('img')
-  artImg.style.cssText = 'width:140px;height:140px;object-fit:cover;border-radius:6px;background:#111;border:1px solid #333;display:block;'
+  artImg.style.cssText = 'width:140px;height:140px;object-fit:cover;border-radius:6px;background:var(--preview-bg);border:1px solid var(--win-border);display:block;'
   artImg.alt = ''
 
   const artStatus = document.createElement('div')
-  artStatus.style.cssText = 'font-size:10px;color:#555;text-align:center;line-height:1.4;'
+  artStatus.style.cssText = 'font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);text-align:center;line-height:1.4;'
   artStatus.textContent = 'Pas de pochette'
 
   const artPickBtn = document.createElement('button')
   artPickBtn.innerHTML = '<i class="fa-solid fa-image"></i> Choisir une pochette'
-  artPickBtn.style.cssText = BTN + 'background:#2a2a2a;border:1px solid #444;color:#ccc;width:100%;font-size:10px;padding:5px 8px;'
+  artPickBtn.style.cssText = BTN + 'background:var(--surface2);border:1px solid var(--win-border);color:var(--text-primary);width:100%;font-size:10px;padding:5px 8px;'
   artPickBtn.disabled = true
 
   const artRemoveBtn = document.createElement('button')
   artRemoveBtn.innerHTML = '<i class="fa-solid fa-trash"></i> Supprimer'
-  artRemoveBtn.style.cssText = BTN + 'background:none;border:1px solid #333;color:#888;width:100%;font-size:10px;padding:4px 8px;display:none;'
+  artRemoveBtn.style.cssText = BTN + 'background:none;border:1px solid var(--win-border);color:var(--text-secondary);width:100%;font-size:10px;padding:4px 8px;display:none;'
 
   // Drag artwork onto the image
   artImg.style.cursor = 'pointer'
@@ -182,7 +182,7 @@ export function initMetadata(body) {
       meta.format && `<b>${meta.format.toUpperCase()}</b>`,
       meta.duration && `Durée: <b>${formatDuration(meta.duration)}</b>`,
       meta.bitrate  && `Débit: <b>${meta.bitrate} kb/s</b>`,
-      isVideo       && `<span style="color:#4a9eff;">Vidéo</span>`,
+      isVideo       && `<span style="color:var(--color-active);">Vidéo</span>`,
     ].filter(Boolean).join(' &nbsp;·&nbsp; ') || '—'
     isDirty = false
     artworkDirty = false
@@ -196,7 +196,7 @@ export function initMetadata(body) {
       artRemoveBtn.style.display = 'block'
     } else {
       artImg.src = ''
-      artImg.style.background = '#111'
+      artImg.style.background = 'var(--preview-bg)'
       artRemoveBtn.style.display = 'none'
     }
     artStatus.textContent = label || 'Pas de pochette'
@@ -287,7 +287,7 @@ export function initMetadata(body) {
     // Show local preview via file:// URL (works in Tauri WebView)
     const url = 'file:///' + p.replace(/\\/g, '/')
     setArtwork(url, '⬤ Nouvelle pochette (non enregistrée)')
-    artStatus.style.color = '#e09052'
+    artStatus.style.color = 'var(--warning)'
     markDirty()
   }
 
@@ -298,7 +298,7 @@ export function initMetadata(body) {
     artworkPath = '__remove__'
     artworkDirty = true
     setArtwork(null, 'Pochette supprimée (à enregistrer)')
-    artStatus.style.color = '#e05252'
+    artStatus.style.color = 'var(--danger)'
     markDirty()
   })
 
@@ -319,7 +319,7 @@ export function initMetadata(body) {
       artworkPath = path
       artworkDirty = true
       setArtwork('file:///' + path.replace(/\\/g, '/'), '⬤ Nouvelle pochette (non enregistrée)')
-      artStatus.style.color = '#e09052'
+      artStatus.style.color = 'var(--warning)'
       markDirty()
     } else {
       window.toast?.('Format non supporté', 'error')
@@ -330,7 +330,7 @@ export function initMetadata(body) {
 
   artWrap.addEventListener('dragover', e => {
     e.preventDefault(); e.stopPropagation()
-    artWrap.style.background = 'rgba(74,158,255,0.08)'
+    artWrap.style.background = 'color-mix(in srgb, var(--color-active) 8%, transparent)'
   })
   artWrap.addEventListener('dragleave', () => { artWrap.style.background = '' })
   artWrap.addEventListener('drop', e => {
@@ -347,7 +347,7 @@ export function initMetadata(body) {
     artworkPath = path
     artworkDirty = true
     setArtwork('file:///' + path.replace(/\\/g, '/'), '⬤ Nouvelle pochette (non enregistrée)')
-    artStatus.style.color = '#e09052'
+    artStatus.style.color = 'var(--warning)'
     markDirty()
   })
 

@@ -196,11 +196,11 @@ input[type="radio"]    { accent-color: var(--color-active); }
 }
 .toast i { font-size: 13px; flex-shrink: 0; }
 .toast-info    i { color: var(--color-active); }
-.toast-success i { color: var(--vu-color-low); }
-.toast-error   i { color: var(--vu-color-high); }
+.toast-success i { color: var(--success); }
+.toast-error   i { color: var(--danger); }
 .toast-info    { border-color: color-mix(in srgb, var(--color-active)  35%, var(--win-border)); }
-.toast-success { border-color: color-mix(in srgb, var(--vu-color-low)  35%, var(--win-border)); }
-.toast-error   { border-color: color-mix(in srgb, var(--vu-color-high) 35%, var(--win-border)); }
+.toast-success { border-color: color-mix(in srgb, var(--success) 35%, var(--win-border)); }
+.toast-error   { border-color: color-mix(in srgb, var(--danger) 35%, var(--win-border)); }
 .toast-out { opacity: 0; transform: translateY(6px); }
 
 /* ── Web version: tool / feature that needs the desktop app ───────────────── */

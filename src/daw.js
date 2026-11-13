@@ -53,7 +53,9 @@ export function initDAW(body) {
 
   // ── State ──────────────────────────────────────────────────────────────────
   const lanes      = [[], [], []]   // lanes[laneIdx] = array of clip objects
-  const laneColors = ['#91D700', '#9B32B9', '#E65F00']  // logo: vert, violet, orange
+  // Default lane colours follow the theme (Clips, accent, master) until the
+  // user picks one for a lane; the picked hex then stays with the project.
+  const laneColors = ['var(--daw-clip-color)', 'var(--color-active)', 'var(--master-color)']
   let playing        = false
   let playCtxStart   = 0
   let activeSources  = []
@@ -464,7 +466,7 @@ export function initDAW(body) {
     const colorBtn = document.createElement('button')
     colorBtn.className = 'daw-color-btn'
     colorBtn.dataset.lane = li
-    colorBtn.style.background = laneColors[li] || '#6c5ce7'
+    colorBtn.style.background = laneColors[li] || 'var(--daw-clip-color)'
     colorBtn.title = t('daw_track_color')
     colorBtn.addEventListener('click', e => { e.stopPropagation(); showLaneColorPicker(li, colorBtn) })
 
@@ -474,7 +476,7 @@ export function initDAW(body) {
 
   function updateSidebarBtn(li) {
     const btn = sidebarBtns.querySelector(`.daw-color-btn[data-lane="${li}"]`)
-    if (btn) btn.style.background = laneColors[li] || '#6c5ce7'
+    if (btn) btn.style.background = laneColors[li] || 'var(--daw-clip-color)'
   }
 
   let _colorPicker = null
@@ -488,7 +490,7 @@ export function initDAW(body) {
       const swatch = document.createElement('div')
       swatch.className = 'daw-lane-color-swatch'
       swatch.style.background = color
-      if (color === (laneColors[li] || '#6c5ce7')) swatch.style.borderColor = '#fff'
+      if (color === (laneColors[li] || 'var(--daw-clip-color)')) swatch.style.borderColor = 'var(--text-primary)'
       swatch.addEventListener('click', e => {
         e.stopPropagation()
         laneColors[li] = color
@@ -1223,7 +1225,7 @@ export function initDAW(body) {
                     proj: 'fa-floppy-disk', wav: 'fa-file-audio' }
     btn.innerHTML = `<i class="fa-solid ${icons[state]}"></i>`
     if (state === 'ok') btn.style.color = 'var(--color-active)'
-    else if (state === 'err') btn.style.color = '#ff5f5f'
+    else if (state === 'err') btn.style.color = 'var(--danger)'
     else btn.style.color = ''
   }
   function resetBtn(btn, icon) {

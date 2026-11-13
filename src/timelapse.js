@@ -47,7 +47,7 @@ export function initTimelapse(body) {
     b.innerHTML = `<i class="fa-solid ${icon}"></i> <span></span>`
     b.querySelector('span').textContent = txt
     b.style.cssText = primary
-      ? 'border:1px solid var(--color-active);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:11px;font-family:inherit;background:var(--color-active);color:#fff;font-weight:600;'
+      ? 'border:1px solid var(--btn-primary);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:11px;font-family:inherit;background:var(--btn-primary);color:var(--on-accent);font-weight:600;'
       : 'border:1px solid var(--win-border-in);border-radius:6px;padding:6px 12px;cursor:pointer;font-size:11px;font-family:inherit;background:var(--surface);color:var(--text-primary);'
     return b
   }

@@ -3,9 +3,20 @@
 import { trackRecentFile } from './recent.js'
 import { t } from './i18n.js'
 import { registerTool } from './project.js'
+import { themeColor } from './theme.js'
 
 let _uid = 0
 function uid() { return ++_uid }
+
+// Relative luminance of a '#rrggbb[aa]' block drawn over the '#rrggbb' bg (-1 if unparsable).
+function blockLum(fill, bg) {
+  const p = h => { const m = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(String(h)); return m ? [...m[1].match(/../g).map(x => parseInt(x, 16)), m[2] ? parseInt(m[2], 16) / 255 : 1] : null }
+  const f = p(fill), b = p(bg)
+  if (!f || !b) return -1
+  const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4 }
+  const [r, g, bl] = [0, 1, 2].map(i => lin(f[i] * f[3] + b[i] * (1 - f[3])))
+  return 0.2126 * r + 0.7152 * g + 0.0722 * bl
+}
 
 function msToTime(ms) {
   const cs = Math.round(ms / 10)
@@ -203,7 +214,7 @@ export function initSubtitles(body) {
   addBtn.innerHTML = '<i class="fa-solid fa-plus"></i> <span></span>'
   addBtn.querySelector('span').textContent = t('sub_add')
   addBtn.title = t('sub_add_hint')
-  addBtn.style.cssText = BTN + 'background:var(--color-active);color:#fff;'
+  addBtn.style.cssText = BTN + 'background:var(--btn-primary);color:var(--on-accent);'
 
   const autoBtn = document.createElement('button')
   autoBtn.style.cssText = GHOST
@@ -404,14 +415,12 @@ export function initSubtitles(body) {
     v.src = src
   })
 
-  // Resolve a theme token to a canvas-usable color (cached per timeline paint)
+  // Theme tokens as canvas-usable #rrggbb (themeColor resolves color-mix values)
   function themeColors() {
-    const cs = getComputedStyle(body)
-    const get = (name, fb) => (cs.getPropertyValue(name) || '').trim() || fb
     return {
-      surface2: get('--surface2', '#141414'),
-      textSec:  get('--text-secondary', '#888'),
-      textPri:  get('--text-primary', '#ddd'),
+      surface2: themeColor('--surface2'),
+      textSec:  themeColor('--text-secondary'),
+      textPri:  themeColor('--text-primary'),
     }
   }
 
@@ -421,6 +430,7 @@ export function initSubtitles(body) {
     const H = 100
     tctx.clearRect(0, 0, W, H)
     const th = themeColors()
+    const lightBg = blockLum(th.surface2, th.surface2) > 0.5
 
     // Background
     tctx.fillStyle = th.surface2
@@ -450,7 +460,8 @@ export function initSubtitles(body) {
       const w = Math.max(4, (sub.end_ms - sub.start_ms) * PX_PER_MS)
       const isSelected = sub.id === selectedId
 
-      tctx.fillStyle = isSelected ? sub.color || COLORS[0] : (sub.color ? sub.color + '99' : COLORS[0] + '88')
+      const fill = isSelected ? sub.color || COLORS[0] : (sub.color ? sub.color + '99' : COLORS[0] + '88')
+      tctx.fillStyle = fill
       tctx.strokeStyle = isSelected ? th.textPri : 'transparent'
       tctx.lineWidth = isSelected ? 1.5 : 0
       tctx.beginPath()
@@ -458,12 +469,16 @@ export function initSubtitles(body) {
       tctx.fill()
       if (isSelected) tctx.stroke()
 
-      // Label (white + shadow for contrast on the colored content blocks)
+      // Label (white + shadow for contrast on the colored content blocks;
+      // on light themes a light block gets the dark text colour instead)
       if (w > 20) {
         tctx.save()
-        tctx.shadowColor = 'rgba(0,0,0,0.6)'
-        tctx.shadowBlur = 2
-        tctx.fillStyle = '#fff'
+        if (lightBg && blockLum(fill, th.surface2) > 0.18) tctx.fillStyle = th.textPri
+        else {
+          tctx.shadowColor = 'rgba(0,0,0,0.6)'
+          tctx.shadowBlur = 2
+          tctx.fillStyle = '#fff'
+        }
         tctx.font = `${Math.min(11, w / 3)}px 'Inter', sans-serif`
         tctx.textAlign = 'left'
         const label = sub.text.length > 20 ? sub.text.slice(0, 20) + '…' : sub.text
@@ -702,7 +717,7 @@ export function initSubtitles(body) {
     note.style.cssText = 'font-size:10px;color:var(--text-secondary);line-height:1.5;opacity:0.8;'
     note.textContent = t('sub_whisper_where')   // the key's text already carries the URL
 
-    goBtn.style.cssText = BTN + 'background:var(--color-active);color:#fff;'
+    goBtn.style.cssText = BTN + 'background:var(--btn-primary);color:var(--on-accent);'
     goBtn.textContent = t('sub_whisper_ok')
     goBtn.addEventListener('click', () => {
       const exe = localStorage.getItem('iceample:whisper:exe')
@@ -1078,10 +1093,12 @@ export function initSubtitles(body) {
   // ResizeObserver to keep canvas sized
   const ro = new ResizeObserver(() => { render() })
   ro.observe(canvasWrap)
+  window.addEventListener('iceample-theme-changed', render)   // repaint the themed timeline
 
   // Teardown: stop the rAF loop and the bg video once the tool is closed
   const mo = new MutationObserver(() => {
     if (document.body.contains(body)) return
+    window.removeEventListener('iceample-theme-changed', render)
     playing = false
     if (raf) cancelAnimationFrame(raf)
     try { exportRec?.stop() } catch {} // recRaf/onstop bail once body is detached

@@ -20,6 +20,7 @@ import {
 } from './audio-bus.js'
 import { t } from './i18n.js'
 import { registerTool } from './project.js'
+import { themeColor } from './theme.js'
 
 // ── Track definitions ────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ function injectStyles() {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #0d0d0d;
+  background: color-mix(in srgb, var(--surface2), var(--workbench-bg) 50%);
   padding: 8px 6px 10px;
   overflow: hidden;
 }
@@ -63,8 +64,8 @@ function injectStyles() {
   flex: 1;
   min-width: 40px;
   height: 100%;
-  background: linear-gradient(180deg, #161616 0%, #111111 100%);
-  border: 1px solid #222;
+  background: linear-gradient(180deg, var(--surface) 0%, var(--surface2) 100%);
+  border: 1px solid var(--win-border-in);
   border-radius: 6px;
   padding: 8px 0 10px;
   position: relative;
@@ -72,27 +73,27 @@ function injectStyles() {
 }
 
 .mix-strip:hover {
-  border-color: #333;
+  border-color: var(--win-border);
 }
 
 .mix-strip-master {
   flex: 1.3;
   background: linear-gradient(180deg,
-    color-mix(in srgb, var(--master-color) 12%, #000) 0%,
-    color-mix(in srgb, var(--master-color)  8%, #000) 100%
+    color-mix(in srgb, var(--master-color) 12%, var(--surface)) 0%,
+    color-mix(in srgb, var(--master-color)  8%, var(--surface2)) 100%
   );
-  border-color: color-mix(in srgb, var(--master-color) 38%, #000);
+  border-color: color-mix(in srgb, var(--master-color) 38%, var(--surface2));
 }
 
 .mix-strip-master:hover {
-  border-color: color-mix(in srgb, var(--master-color) 58%, #000);
+  border-color: color-mix(in srgb, var(--master-color) 58%, var(--surface2));
 }
 
 .mix-sep {
   width: 1px;
   align-self: stretch;
   margin: 0 4px;
-  background: linear-gradient(180deg, transparent 5%, #2a2a2a 30%, #2a2a2a 70%, transparent 95%);
+  background: linear-gradient(180deg, transparent 5%, var(--win-border) 30%, var(--win-border) 70%, transparent 95%);
   flex-shrink: 0;
 }
 
@@ -102,13 +103,13 @@ function injectStyles() {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #555;
+  color: color-mix(in srgb, var(--text-secondary) 65%, transparent);
   margin-bottom: 1px;
   flex-shrink: 0;
 }
 
 .mix-strip-master .mix-label {
-  color: color-mix(in srgb, var(--master-color) 75%, #888);
+  color: color-mix(in srgb, var(--master-color) 75%, var(--text-secondary));
   letter-spacing: 0.1em;
 }
 
@@ -123,7 +124,7 @@ function injectStyles() {
 .mix-db-scale { position: relative; width: 17px; margin-left: 3px; align-self: stretch; }
 .mix-db-tick {
   position: absolute; right: 0; transform: translateY(-50%);
-  font-size: 6px; line-height: 1; color: #555;
+  font-size: 6px; line-height: 1; color: color-mix(in srgb, var(--text-secondary) 65%, transparent);
   font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
 }
 
@@ -131,7 +132,7 @@ function injectStyles() {
 .mix-db {
   font-size: 8.5px;
   font-variant-numeric: tabular-nums;
-  color: #404040;
+  color: color-mix(in srgb, var(--text-secondary) 50%, transparent);
   letter-spacing: 0.02em;
   min-width: 32px;
   text-align: center;
@@ -140,7 +141,7 @@ function injectStyles() {
 }
 
 .mix-db.active {
-  color: #909090;
+  color: var(--text-secondary);
 }
 
 /* Vertical fader */
@@ -173,21 +174,24 @@ function injectStyles() {
 .mix-fader::-webkit-slider-runnable-track {
   width: 3px;
   height: 100%;
-  background: #1e1e1e;
+  background: var(--win-border-in);
   border-radius: 2px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--win-border);
 }
 
-/* WebKit thumb */
+/* WebKit thumb (metallic cap derived from the theme, light on light themes) */
 .mix-fader::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 22px;
   height: 10px;
-  background: linear-gradient(90deg, #3a3a3a 0%, #555 40%, #3a3a3a 100%);
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--text-secondary) 30%, var(--surface)) 0%,
+    color-mix(in srgb, var(--text-secondary) 55%, var(--surface)) 40%,
+    color-mix(in srgb, var(--text-secondary) 30%, var(--surface)) 100%);
   border-radius: 3px;
-  border: 1px solid #666;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06);
+  border: 1px solid color-mix(in srgb, var(--text-secondary) 70%, var(--surface));
+  box-shadow: 0 1px 4px rgba(0,0,0,0.7), inset 0 1px 0 color-mix(in srgb, var(--text-primary) 6%, transparent);
   cursor: grab;
   margin-left: -9px;
   position: relative;
@@ -195,56 +199,62 @@ function injectStyles() {
 
 .mix-fader::-webkit-slider-thumb:active {
   cursor: grabbing;
-  background: linear-gradient(90deg, #444 0%, #666 40%, #444 100%);
-  border-color: #888;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--text-secondary) 40%, var(--surface)) 0%,
+    color-mix(in srgb, var(--text-secondary) 70%, var(--surface)) 40%,
+    color-mix(in srgb, var(--text-secondary) 40%, var(--surface)) 100%);
+  border-color: var(--text-secondary);
 }
 
 /* Firefox track */
 .mix-fader::-moz-range-track {
   width: 3px;
-  background: #1e1e1e;
+  background: var(--win-border-in);
   border-radius: 2px;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--win-border);
 }
 
 /* Firefox thumb */
 .mix-fader::-moz-range-thumb {
   width: 22px;
   height: 10px;
-  background: linear-gradient(90deg, #3a3a3a 0%, #555 40%, #3a3a3a 100%);
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--text-secondary) 30%, var(--surface)) 0%,
+    color-mix(in srgb, var(--text-secondary) 55%, var(--surface)) 40%,
+    color-mix(in srgb, var(--text-secondary) 30%, var(--surface)) 100%);
   border-radius: 3px;
-  border: 1px solid #666;
+  border: 1px solid color-mix(in srgb, var(--text-secondary) 70%, var(--surface));
   box-shadow: 0 1px 4px rgba(0,0,0,0.7);
   cursor: grab;
 }
 
 .mix-strip-master .mix-fader::-webkit-slider-thumb {
   background: linear-gradient(90deg,
-    color-mix(in srgb, var(--master-color) 55%, #000) 0%,
+    color-mix(in srgb, var(--master-color) 55%, var(--surface)) 0%,
     var(--master-color) 40%,
-    color-mix(in srgb, var(--master-color) 55%, #000) 100%
+    color-mix(in srgb, var(--master-color) 55%, var(--surface)) 100%
   );
-  border-color: color-mix(in srgb, #fff 18%, var(--master-color));
-  box-shadow: 0 1px 6px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.06);
+  border-color: color-mix(in srgb, var(--text-primary) 18%, var(--master-color));
+  box-shadow: 0 1px 6px rgba(0,0,0,0.8), inset 0 1px 0 color-mix(in srgb, var(--text-primary) 6%, transparent);
 }
 
 .mix-strip-master .mix-fader::-moz-range-thumb {
   background: linear-gradient(90deg,
-    color-mix(in srgb, var(--master-color) 55%, #000) 0%,
+    color-mix(in srgb, var(--master-color) 55%, var(--surface)) 0%,
     var(--master-color) 40%,
-    color-mix(in srgb, var(--master-color) 55%, #000) 100%
+    color-mix(in srgb, var(--master-color) 55%, var(--surface)) 100%
   );
-  border-color: color-mix(in srgb, #fff 18%, var(--master-color));
+  border-color: color-mix(in srgb, var(--text-primary) 18%, var(--master-color));
 }
 
 /* Mute button */
 .mix-mute {
   width: 26px;
   height: 16px;
-  background: #1a1a1a;
-  border: 1px solid #2e2e2e;
+  background: var(--surface2);
+  border: 1px solid var(--win-border);
   border-radius: 3px;
-  color: #404040;
+  color: color-mix(in srgb, var(--text-secondary) 50%, transparent);
   font-size: 8px;
   font-weight: 800;
   letter-spacing: 0.05em;
@@ -259,16 +269,16 @@ function injectStyles() {
 }
 
 .mix-mute:hover {
-  background: #242424;
-  color: #888;
-  border-color: #444;
+  background: color-mix(in srgb, var(--surface2), var(--text-primary) 10%);
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--win-border), var(--text-secondary) 30%);
 }
 
 .mix-mute.active {
-  background: #3d1a1a;
-  border-color: #7a2020;
-  color: #e05050;
-  box-shadow: 0 0 6px rgba(200, 50, 50, 0.25);
+  background: color-mix(in srgb, var(--danger) 18%, var(--surface2));
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--surface2));
+  color: var(--danger);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--danger) 25%, transparent);
 }
 
 /* Mute + Solo row */
@@ -276,10 +286,10 @@ function injectStyles() {
 .mix-solo {
   width: 26px;
   height: 16px;
-  background: #1a1a1a;
-  border: 1px solid #2e2e2e;
+  background: var(--surface2);
+  border: 1px solid var(--win-border);
   border-radius: 3px;
-  color: #404040;
+  color: color-mix(in srgb, var(--text-secondary) 50%, transparent);
   font-size: 8px;
   font-weight: 800;
   letter-spacing: 0.05em;
@@ -292,12 +302,12 @@ function injectStyles() {
   font-family: inherit;
   line-height: 1;
 }
-.mix-solo:hover { background: #242424; color: #888; border-color: #444; }
+.mix-solo:hover { background: color-mix(in srgb, var(--surface2), var(--text-primary) 10%); color: var(--text-secondary); border-color: color-mix(in srgb, var(--win-border), var(--text-secondary) 30%); }
 .mix-solo.active {
-  background: #3a3415;
-  border-color: #8a7a20;
-  color: #e8d24a;
-  box-shadow: 0 0 6px rgba(220, 200, 60, 0.25);
+  background: color-mix(in srgb, var(--warning) 18%, var(--surface2));
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--surface2));
+  color: var(--warning);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--warning) 25%, transparent);
 }
 
 /* Pan knob row */
@@ -311,14 +321,14 @@ function injectStyles() {
 }
 .mix-pan-label {
   font-size: 7px;
-  color: #444;
+  color: color-mix(in srgb, var(--text-secondary) 65%, transparent);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 .mix-pan-val {
   font-size: 8px;
   font-variant-numeric: tabular-nums;
-  color: #555;
+  color: color-mix(in srgb, var(--text-secondary) 65%, transparent);
   min-width: 28px;
   text-align: center;
 }
@@ -327,7 +337,7 @@ function injectStyles() {
   appearance: none;
   width: 100%;
   height: 3px;
-  background: #1e1e1e;
+  background: var(--win-border);
   border-radius: 2px;
   outline: none;
   cursor: pointer;
@@ -339,7 +349,7 @@ function injectStyles() {
   width: 10px; height: 10px;
   border-radius: 50%;
   background: var(--slider-color, #4a9eff);
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 15%, transparent);
   cursor: grab;
 }
 .mix-pan::-webkit-slider-thumb:active { cursor: grabbing; }
@@ -348,10 +358,10 @@ function injectStyles() {
 .mix-comp-btn {
   width: 100%;
   height: 14px;
-  background: #161616;
-  border: 1px solid #222;
+  background: var(--surface2);
+  border: 1px solid var(--win-border-in);
   border-radius: 3px;
-  color: #3a3a3a;
+  color: color-mix(in srgb, var(--text-secondary) 50%, transparent);
   font-size: 7px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -364,12 +374,12 @@ function injectStyles() {
   flex-shrink: 0;
   font-family: inherit;
 }
-.mix-comp-btn:hover { background: #1e1e1e; color: #666; border-color: #333; }
+.mix-comp-btn:hover { background: color-mix(in srgb, var(--surface2), var(--text-primary) 10%); color: var(--text-secondary); border-color: var(--win-border); }
 .mix-comp-btn.active {
-  background: #0e2030;
-  border-color: #1e5a8a;
-  color: #4a9eff;
-  box-shadow: 0 0 4px rgba(74,158,255,0.2);
+  background: color-mix(in srgb, var(--color-active) 15%, var(--surface2));
+  border-color: color-mix(in srgb, var(--color-active) 45%, var(--surface2));
+  color: var(--color-active);
+  box-shadow: 0 0 4px color-mix(in srgb, var(--color-active) 20%, transparent);
 }
 
 /* Mixdown record/export button (master) */
@@ -377,10 +387,10 @@ function injectStyles() {
   width: 100%;
   height: 16px;
   margin-top: 4px;
-  background: #161616;
-  border: 1px solid #222;
+  background: var(--surface2);
+  border: 1px solid var(--win-border-in);
   border-radius: 3px;
-  color: #555;
+  color: color-mix(in srgb, var(--text-secondary) 65%, transparent);
   font-size: 8px;
   cursor: pointer;
   display: flex;
@@ -389,11 +399,11 @@ function injectStyles() {
   transition: background 0.12s, color 0.12s, border-color 0.12s;
   flex-shrink: 0;
 }
-.mix-export-btn:hover { background: #1e1e1e; color: #888; border-color: #333; }
+.mix-export-btn:hover { background: color-mix(in srgb, var(--surface2), var(--text-primary) 10%); color: var(--text-secondary); border-color: var(--win-border); }
 .mix-export-btn.recording {
-  background: color-mix(in srgb, #dc281e 18%, #000);
-  border-color: #dc281e;
-  color: #dc281e;
+  background: color-mix(in srgb, var(--danger) 18%, var(--surface2));
+  border-color: var(--danger);
+  color: var(--danger);
   animation: mix-rec-pulse 1.1s ease-in-out infinite;
 }
 @keyframes mix-rec-pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.55 } }
@@ -408,8 +418,8 @@ function injectStyles() {
   flex-direction: column;
   gap: 3px;
   padding: 7px 8px;
-  background: #121214;
-  border: 1px solid #2c2c2e;
+  background: var(--surface);
+  border: 1px solid var(--win-border);
   border-radius: 6px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.7);
   z-index: 9999;
@@ -418,16 +428,16 @@ function injectStyles() {
 .mix-comp-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 6px; padding-bottom: 4px; margin-bottom: 2px;
-  border-bottom: 1px solid #242426;
+  border-bottom: 1px solid var(--win-border-in);
 }
-.mix-comp-head-lbl { font-size: 7px; font-weight: 800; letter-spacing: 0.1em; color: #777; }
+.mix-comp-head-lbl { font-size: 7px; font-weight: 800; letter-spacing: 0.1em; color: var(--text-secondary); }
 .mix-comp-en {
   height: 13px; padding: 0 7px; border-radius: 3px;
-  background: #1a1a1a; border: 1px solid #2a2a2a; color: #555;
+  background: var(--surface2); border: 1px solid var(--win-border); color: color-mix(in srgb, var(--text-secondary) 65%, transparent);
   font-size: 7px; font-weight: 800; letter-spacing: 0.06em; cursor: pointer; font-family: inherit;
 }
-.mix-comp-en:hover { background: #222; color: #888; }
-.mix-comp-en.active { background: #0e2030; border-color: #1e5a8a; color: #4a9eff; }
+.mix-comp-en:hover { background: color-mix(in srgb, var(--surface2), var(--text-primary) 10%); color: var(--text-secondary); }
+.mix-comp-en.active { background: color-mix(in srgb, var(--color-active) 15%, var(--surface2)); border-color: color-mix(in srgb, var(--color-active) 45%, var(--surface2)); color: var(--color-active); }
 .mix-comp-row {
   display: flex;
   align-items: center;
@@ -436,7 +446,7 @@ function injectStyles() {
 }
 .mix-comp-lbl {
   font-size: 7px;
-  color: #444;
+  color: color-mix(in srgb, var(--text-secondary) 65%, transparent);
   min-width: 18px;
   text-align: right;
   flex-shrink: 0;
@@ -445,7 +455,7 @@ function injectStyles() {
   flex: 1;
   -webkit-appearance: none;
   height: 2px;
-  background: #252525;
+  background: var(--win-border);
   border-radius: 1px;
   outline: none;
   cursor: pointer;
@@ -455,12 +465,12 @@ function injectStyles() {
   -webkit-appearance: none;
   width: 8px; height: 8px;
   border-radius: 50%;
-  background: #4a9eff;
+  background: var(--slider-color);
   border: none;
 }
 .mix-comp-val {
   font-size: 7px;
-  color: #555;
+  color: color-mix(in srgb, var(--text-secondary) 65%, transparent);
   min-width: 22px;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -513,7 +523,7 @@ function drawVU(canvas, analyser, dbEl) {
     const lit = ratio <= norm
 
     if (!lit) {
-      ctx.fillStyle = 'rgba(255,255,255,0.05)'
+      ctx.fillStyle = themeColor('--text-primary') + '0d'   // 5% alpha
     } else if (ratio < 0.65) {
       ctx.fillStyle = colLow
     } else if (ratio < 0.85) {
@@ -768,7 +778,7 @@ function buildStrip(trackDef, isMaster, cleanups = []) {
     corrWrap.style.cssText = 'width:100%;padding:0 4px;flex-shrink:0;'
 
     const corrLabel = document.createElement('div')
-    corrLabel.style.cssText = 'font-size:8px;text-align:center;color:#444;letter-spacing:0.1em;margin-bottom:2px;'
+    corrLabel.style.cssText = 'font-size:8px;text-align:center;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);letter-spacing:0.1em;margin-bottom:2px;'
     corrLabel.textContent = 'Φ'
 
     corrCanvas = document.createElement('canvas')
@@ -888,7 +898,7 @@ function drawCorrelation(canvas) {
     ctx.clearRect(0, 0, w, h)
 
     // Background track
-    ctx.fillStyle = '#111'
+    ctx.fillStyle = themeColor('--surface2')
     ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(0, 0, w, h, 3); else ctx.rect(0, 0, w, h)
     ctx.fill()
 
@@ -902,7 +912,7 @@ function drawCorrelation(canvas) {
     ctx.fill()
 
     // Center line
-    ctx.fillStyle = '#333'
+    ctx.fillStyle = themeColor('--win-border')
     ctx.fillRect(center - 0.5, 0, 1, h)
   } catch (_) {}
 }

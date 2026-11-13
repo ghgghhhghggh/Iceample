@@ -9,22 +9,22 @@ function injectStyles() {
 .rnd-overlay { position:fixed; inset:0; z-index:10000; display:flex; align-items:center; justify-content:center;
   background:rgba(0,0,0,0.5); backdrop-filter:blur(2px); animation:rnd-fade .12s ease; }
 @keyframes rnd-fade { from{opacity:0} to{opacity:1} }
-.rnd-card { width:300px; max-width:88vw; background:#16161a; border:1px solid var(--win-border,#2c2c2e);
+.rnd-card { width:300px; max-width:88vw; background:var(--surface); border:1px solid var(--win-border,#2c2c2e);
   border-radius:10px; box-shadow:0 16px 48px rgba(0,0,0,0.6); padding:16px; display:flex; flex-direction:column; gap:12px;
   animation:rnd-pop .14s cubic-bezier(.2,.9,.3,1.2); }
 @keyframes rnd-pop { from{transform:scale(.94);opacity:0} to{transform:scale(1);opacity:1} }
 .rnd-title { font-size:12px; font-weight:700; letter-spacing:0.04em; color:var(--text-primary,#fff);
   display:flex; align-items:center; gap:8px; }
 .rnd-title i { color:var(--color-active,#4a9eff); }
-.rnd-input { background:#0e0e10; border:1px solid var(--win-border,#2a2a2a); border-radius:6px;
+.rnd-input { background:var(--surface2); border:1px solid var(--win-border,#2a2a2a); border-radius:6px;
   color:var(--text-primary,#fff); font-family:inherit; font-size:13px; padding:8px 10px; outline:none; }
 .rnd-input:focus { border-color:var(--color-active,#4a9eff); }
 .rnd-row { display:flex; gap:8px; justify-content:flex-end; }
 .rnd-btn { font-family:inherit; font-size:11px; padding:7px 14px; border-radius:6px; cursor:pointer;
-  border:1px solid var(--win-border,#2a2a2a); background:#1c1c20; color:var(--text-secondary,#aaa);
+  border:1px solid var(--win-border,#2a2a2a); background:var(--surface2); color:var(--text-secondary,#aaa);
   transition:background .1s,color .1s; }
-.rnd-btn:hover { background:#26262c; color:var(--text-primary,#fff); }
-.rnd-btn.primary { background:var(--color-active,#4a9eff); border-color:var(--color-active,#4a9eff); color:#fff; font-weight:600; }
+.rnd-btn:hover { background:color-mix(in srgb, var(--surface2), var(--text-primary) 10%); color:var(--text-primary,#fff); }
+.rnd-btn.primary { background:var(--btn-primary); border-color:var(--btn-primary); color:var(--on-accent); font-weight:600; }
 .rnd-btn.primary:hover { filter:brightness(1.1); }
   `
   document.head.appendChild(s)

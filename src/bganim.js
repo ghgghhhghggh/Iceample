@@ -37,7 +37,7 @@ function injectStyles() {
 .bga-row{display:flex;align-items:center;gap:8px}
 .bga-row label{width:58px;flex-shrink:0;font-size:10px;color:var(--text-secondary)}
 .bga-slider{flex:1;min-width:0;height:3px;background:var(--win-border-in);border-radius:2px;outline:none;cursor:pointer;-webkit-appearance:none}
-.bga-slider::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--color-active);cursor:pointer;border:2px solid var(--surface)}
+.bga-slider::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--slider-color);cursor:pointer;border:2px solid var(--surface)}
 .bga-sval{width:22px;font-size:11px;color:var(--color-active);text-align:right;font-variant-numeric:tabular-nums;flex-shrink:0}
 .bga-colors{display:flex;gap:6px;align-items:center}
 .bga-color{flex:1;height:28px;padding:0;border:1px solid var(--win-border-in);border-radius:6px;cursor:pointer;background:none;min-width:0}

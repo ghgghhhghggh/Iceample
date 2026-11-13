@@ -1,6 +1,8 @@
-// bg-spectrum.js — WebGL2 animated visual background shader
+// bg-spectrum.js — WebGL2 / Canvas 2D animated background of the workbench
 // Pure visual effect, zero audio dependency.
-// 6 styles: Cosmos (deep-space nebula), Plasma, Waves, Stars, Grid, Aurora
+// 12 styles: 8 WebGL (plasma, waves, stars, grid, aurora, cosmos, particles,
+// dither) + 4 Canvas 2D (bg-gradient, bg-plasma, bg-geometry, bg-nebula).
+// Light themes: see _applyThemeMode().
 
 const LS_KEY = 'iceample:bgspectrum'
 
@@ -153,7 +155,9 @@ vec4 styleAurora(vec2 uv) {
                 + 0.04 * sin(uv.x * (4.8 + fi * 1.2) + t * 1.8 + phase * 2.0);
     float thick = max(0.038 + fi * 0.010, 0.001);
     float d     = exp(-pow(abs(uv.y - bandY) / thick, 1.35)) * w;
-    float blend = fract(fi * 0.2 + uv.x * 0.35 + t * 0.05);
+    // Smooth back-and-forth between the two colours (fract() used to jump from
+    // 1 to 0, drawing a hard vertical seam across the ribbons).
+    float blend = 0.5 + 0.5 * sin((fi * 0.2 + uv.x * 0.35 + t * 0.05) * 6.2831853);
     col += mix(u_color, u_color2, blend) * d;
     v   += d;
   }
@@ -267,13 +271,40 @@ void main() {
 }`
 
 // ── Config helpers ─────────────────────────────────────────────────────────────
-export function getBgConfig() {
-  try { return { ...DEFAULT_CFG, ...JSON.parse(localStorage.getItem(LS_KEY) || '{}') } }
-  catch { return { ...DEFAULT_CFG } }
+let _cfgCache = null
+function _readCfg() {
+  if (!_cfgCache) {
+    try { _cfgCache = { ...DEFAULT_CFG, ...JSON.parse(localStorage.getItem(LS_KEY) || '{}') } }
+    catch { _cfgCache = { ...DEFAULT_CFG } }
+  }
+  return _cfgCache
 }
 
+export function getBgConfig() { return { ..._readCfg() } }
+
 export function setBgConfig(partial) {
-  localStorage.setItem(LS_KEY, JSON.stringify({ ...getBgConfig(), ...partial }))
+  _cfgCache = { ..._readCfg(), ...partial }
+  try { localStorage.setItem(LS_KEY, JSON.stringify(_cfgCache)) } catch {}
+  // The render loop stops while the background is off: restart it on enable.
+  if (_cfgCache.enabled && _gl && _prog) _startLoop()
+}
+
+// Light themes: every style is drawn as glows / stars on a dark background,
+// which vanish or turn into a grey veil on a light one. There the canvases are
+// inverted in lightness only (hue-rotate puts the hues back), so the same
+// effects show as darker tints of the same colours.
+function _isLightTheme() {
+  const v = getComputedStyle(document.documentElement).getPropertyValue('--workbench-bg').trim()
+  const m = /^#([0-9a-f]{6})$/i.exec(v)
+  if (!m) return false
+  const n = parseInt(m[1], 16)
+  const lum = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255
+  return lum > 0.5
+}
+function _applyThemeMode() {
+  const f = _isLightTheme() ? 'invert(1) hue-rotate(180deg)' : ''
+  if (_canvas)   _canvas.style.filter   = f
+  if (_canvas2d) _canvas2d.style.filter = f
 }
 
 // ── Internal state ─────────────────────────────────────────────────────────────
@@ -484,6 +515,11 @@ export function initBgSpectrum(workbench) {
   workbench.insertBefore(_canvas2d, workbench.firstChild)
   _ctx2d = _canvas2d.getContext('2d')
 
+  // The theme is restored right after this init: apply the light/dark mode on
+  // the next frame, then whenever the theme changes.
+  requestAnimationFrame(_applyThemeMode)
+  window.addEventListener('iceample-theme-changed', _applyThemeMode)
+
   _gl = _canvas.getContext('webgl2', { alpha: true, premultipliedAlpha: false })
   if (!_gl) { console.warn('[BgShader] WebGL2 unavailable'); return }
 
@@ -563,14 +599,17 @@ function _startLoop() {
   const uStyle = gl.getUniformLocation(prog, 'u_style')
   const t0 = performance.now()
 
+  _applyThemeMode()
   ;(function frame() {
     _raf = requestAnimationFrame(frame)
-    const cfg  = getBgConfig()
+    const cfg  = _readCfg()
     const is2D = CANVAS2D_STYLES.has(cfg.style)
 
     if (!cfg.enabled) {
       if (_canvas.style.display   !== 'none') _canvas.style.display   = 'none'
       if (_canvas2d && _canvas2d.style.display !== 'none') _canvas2d.style.display = 'none'
+      // Nothing to draw: stop the loop (setBgConfig restarts it on enable).
+      cancelAnimationFrame(_raf); _raf = null
       return
     }
 

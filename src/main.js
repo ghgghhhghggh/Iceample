@@ -24,7 +24,7 @@ import {
   toggleMaximizeWin,
 } from './window-manager.js'
 import {
-  initTheme, themeMap, notifyThemeChange,
+  initTheme, themeMap, notifyThemeChange, resetThemeColors,
 } from './theme.js'
 import {
   initSettings, buildLangTab, buildAudioTab, buildDisplayTab, buildShortcutsTab,
@@ -534,17 +534,9 @@ window.addEventListener('DOMContentLoaded', () => {
     })
   })
 
-  // Reset button — restore HTML default values
-  document.getElementById('theme-reset-btn')?.addEventListener('click', () => {
-    Object.entries(themeMap).forEach(([id, cssVar]) => {
-      const inp = document.getElementById(id)
-      if (!inp) return
-      const def = inp.defaultValue || inp.getAttribute('value') || ''
-      inp.value = def
-      document.documentElement.style.removeProperty(cssVar)
-      try { localStorage.removeItem('theme:' + cssVar) } catch {}
-    })
-  })
+  // Reset button — back to the default theme (pickers then show its colours;
+  // they used to show stale HTML defaults).
+  document.getElementById('theme-reset-btn')?.addEventListener('click', () => resetThemeColors())
 
   // Settings tabs nav
   document.querySelectorAll('.settings-nav-btn[data-tab]').forEach(btn => {
@@ -1016,7 +1008,7 @@ window.addEventListener('DOMContentLoaded', () => {
       <i class="fa-solid fa-cloud-arrow-down" style="color:var(--color-active,#4a9eff);font-size:14px;"></i>
       <span>${t('proj_recovery')}</span>
       <button id="recovery-restore" style="
-        background:var(--color-active,#4a9eff);border:none;color:#fff;padding:4px 10px;
+        background:var(--btn-primary);border:none;color:var(--on-accent);padding:4px 10px;
         border-radius:4px;font-size:11px;cursor:pointer;font-family:inherit;">
         ${t('proj_recovery_restore')}
       </button>

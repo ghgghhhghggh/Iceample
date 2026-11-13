@@ -15,44 +15,44 @@ function injectStyles() {
 }
 .tempo-section-hdr {
   font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
-  text-transform: uppercase; color: rgba(255,255,255,0.25);
-  padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,0.06);
+  text-transform: uppercase; color: color-mix(in srgb, var(--text-primary) 25%, transparent);
+  padding-bottom: 6px; border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 6%, transparent);
 }
 /* BPM row (shared) */
 .tempo-bpm-row {
   display: flex; align-items: center; gap: 8px;
 }
 .tempo-bpm-inp {
-  width: 72px; background: #161616; border: 1px solid var(--win-border);
+  width: 72px; background: var(--surface2); border: 1px solid var(--win-border);
   border-radius: 5px; color: var(--text-primary); font-size: 22px;
   font-family: inherit; font-weight: 700; text-align: center;
   padding: 4px 0; outline: none;
 }
 .tempo-bpm-inp:focus { border-color: var(--color-active); }
 .tempo-tap-btn {
-  flex: 1; height: 38px; background: #1a1a1a; border: 1px solid var(--win-border);
+  flex: 1; height: 38px; background: var(--surface2); border: 1px solid var(--win-border);
   border-radius: 5px; color: var(--text-secondary); font-size: 11px;
   font-family: inherit; cursor: pointer; letter-spacing: 0.06em;
   transition: background 0.08s, border-color 0.08s, color 0.08s;
 }
-.tempo-tap-btn:active { background: #2a2a2a; border-color: #444; color: var(--text-primary); }
+.tempo-tap-btn:active { background: color-mix(in srgb, var(--surface2), var(--text-primary) 10%); border-color: color-mix(in srgb, var(--win-border), var(--text-primary) 15%); color: var(--text-primary); }
 /* Metronome */
 .metro-controls {
   display: flex; align-items: center; gap: 8px;
 }
 .metro-play-btn {
   width: 36px; height: 36px; border-radius: 50%;
-  background: #1a1a1a; border: 1px solid var(--win-border);
+  background: var(--surface2); border: 1px solid var(--win-border);
   color: var(--text-secondary); font-size: 13px;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer; transition: all 0.12s; flex-shrink: 0;
 }
 .metro-play-btn.playing {
-  background: color-mix(in srgb, var(--color-active) 15%, #000);
+  background: color-mix(in srgb, var(--color-active) 15%, var(--surface2));
   border-color: var(--color-active); color: var(--color-active);
 }
 .metro-sig-select {
-  background: #161616; border: 1px solid var(--win-border); border-radius: 4px;
+  background: var(--surface2); border: 1px solid var(--win-border); border-radius: 4px;
   color: var(--text-primary); font-size: 11px; font-family: inherit;
   padding: 4px 6px; cursor: pointer;
 }
@@ -62,11 +62,11 @@ function injectStyles() {
 .metro-vol-wrap span { font-size: 10px; color: var(--dim); }
 .metro-vol {
   flex: 1; -webkit-appearance: none; appearance: none;
-  height: 3px; background: #2a2a2a; border-radius: 2px; outline: none; cursor: pointer;
+  height: 3px; background: var(--win-border); border-radius: 2px; outline: none; cursor: pointer;
 }
 .metro-vol::-webkit-slider-thumb {
   -webkit-appearance: none; width: 10px; height: 10px;
-  border-radius: 50%; background: var(--color-active); cursor: pointer;
+  border-radius: 50%; background: var(--slider-color); cursor: pointer;
 }
 /* Beat visualizer */
 .metro-beats {
@@ -74,10 +74,10 @@ function injectStyles() {
 }
 .metro-beat-dot {
   flex: 1; height: 8px; border-radius: 4px;
-  background: #222; transition: background 0.05s;
+  background: var(--win-border); transition: background 0.05s;
 }
 .metro-beat-dot.on { background: var(--color-active); box-shadow: 0 0 6px var(--color-active); }
-.metro-beat-dot.down { background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.6); }
+.metro-beat-dot.down { background: var(--text-primary); box-shadow: 0 0 8px color-mix(in srgb, var(--text-primary) 60%, transparent); }
 `
   document.head.appendChild(s)
 }

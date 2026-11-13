@@ -26,7 +26,7 @@ export function initQrcode(body) {
   leftPanel.style.cssText = 'display:flex;flex-direction:column;gap:10px;padding:12px;width:220px;flex-shrink:0;overflow-y:auto;border-right:1px solid var(--win-border-in,#1e1e1e);background:var(--surface2,#141414);'
 
   const previewArea = document.createElement('div')
-  previewArea.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;background:#0a0a0a;'
+  previewArea.style.cssText = 'flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;background:var(--preview-bg);'
 
   main.append(leftPanel, previewArea)
   body.append(main)
@@ -42,14 +42,14 @@ export function initQrcode(body) {
 
   const exportRow = document.createElement('div')
   exportRow.style.cssText = 'display:flex;gap:8px;'
-  const BTN = (txt, icon, col) => {
+  const BTN = (txt, icon, col, fg = 'var(--on-accent)') => {
     const b = document.createElement('button')
     b.innerHTML = `<i class="fa-solid ${icon}"></i> ${txt}`
-    b.style.cssText = `border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:11px;font-family:inherit;background:${col};color:#fff;`
+    b.style.cssText = `border:none;border-radius:6px;padding:7px 14px;cursor:pointer;font-size:11px;font-family:inherit;background:${col};color:${fg};`
     return b
   }
-  const exportPngBtn = BTN('PNG', 'fa-image', '#2a6fdb')
-  const exportSvgBtn = BTN('SVG', 'fa-code', '#555')
+  const exportPngBtn = BTN('PNG', 'fa-image', 'var(--color-active)')
+  const exportSvgBtn = BTN('SVG', 'fa-code', 'color-mix(in srgb,var(--text-primary) 10%,var(--surface))', 'var(--text-primary)')
   // "Send to…" — ship the QR (rasterized at 512px) to another image tool.
   const sendBtn = makeSendButton(() => new Promise(resolve => {
     if (!currentSvg) { resolve(null); return }
@@ -78,7 +78,7 @@ export function initQrcode(body) {
 
   function label(txt) {
     const d = document.createElement('div')
-    d.style.cssText = 'font-size:10px;color:#666;text-transform:uppercase;letter-spacing:0.5px;'
+    d.style.cssText = 'font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;'
     d.textContent = txt; return d
   }
 
@@ -180,19 +180,19 @@ export function initQrcode(body) {
   leftPanel.appendChild(label('Couleurs'))
   const colorRow = document.createElement('div')
   colorRow.style.cssText = 'display:flex;gap:8px;align-items:center;'
-  const fgLabel = document.createElement('span'); fgLabel.style.cssText = 'font-size:11px;color:#aaa;flex:1;'; fgLabel.textContent = 'Code'
+  const fgLabel = document.createElement('span'); fgLabel.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;'; fgLabel.textContent = 'Code'
   const fgInp = document.createElement('input'); fgInp.type = 'color'; fgInp.value = '#000000'
-  fgInp.style.cssText = 'width:36px;height:24px;border:1px solid #444;border-radius:4px;padding:1px;cursor:pointer;background:none;'
-  const bgLabel = document.createElement('span'); bgLabel.style.cssText = 'font-size:11px;color:#aaa;flex:1;'; bgLabel.textContent = 'Fond'
+  fgInp.style.cssText = 'width:36px;height:24px;border:1px solid var(--win-border);border-radius:4px;padding:1px;cursor:pointer;background:none;'
+  const bgLabel = document.createElement('span'); bgLabel.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;'; bgLabel.textContent = 'Fond'
   const bgInp = document.createElement('input'); bgInp.type = 'color'; bgInp.value = '#ffffff'
-  bgInp.style.cssText = 'width:36px;height:24px;border:1px solid #444;border-radius:4px;padding:1px;cursor:pointer;background:none;'
+  bgInp.style.cssText = 'width:36px;height:24px;border:1px solid var(--win-border);border-radius:4px;padding:1px;cursor:pointer;background:none;'
   colorRow.append(fgLabel, fgInp, bgLabel, bgInp)
   leftPanel.appendChild(colorRow)
 
   // Generate button
   const genBtn = document.createElement('button')
   genBtn.innerHTML = '<i class="fa-solid fa-qrcode"></i> Générer'
-  genBtn.style.cssText = 'border:none;border-radius:6px;padding:8px;cursor:pointer;font-size:12px;font-family:inherit;background:var(--color-active,#4a9eff);color:#fff;width:100%;margin-top:4px;'
+  genBtn.style.cssText = 'border:none;border-radius:6px;padding:8px;cursor:pointer;font-size:12px;font-family:inherit;background:var(--btn-primary);color:var(--on-accent);width:100%;margin-top:4px;'
   leftPanel.appendChild(genBtn)
 
   // ── Generate ───────────────────────────────────────────────────────────────
