@@ -1,0 +1,53 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Iceample",
+  "version": "2.2.0",
+  "identifier": "com.iceample.app",
+  "build": {
+    "frontendDist": "../src",
+    "beforeBuildCommand": "node scripts/prepare-bridge.mjs"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Iceample",
+        "width": 800,
+        "height": 600,
+        "maximized": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "publisher": "Kyliann Chapel",
+    "copyright": "Copyright (c) 2026 Kyliann Chapel",
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/yt-dlp",
+      "binaries/ffmpeg"
+    ],
+    "resources": [
+      "bridge/iceample-vst-bridge.exe"
+    ],
+    "windows": {
+      "nsis": {
+        "displayLanguageSelector": false,
+        "installMode": "perMachine",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "installer-assets/installer-header.bmp",
+        "sidebarImage": "installer-assets/installer-sidebar.bmp"
+      }
+    }
+  }
+}

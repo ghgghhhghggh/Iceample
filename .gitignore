@@ -1,0 +1,60 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Rust build output
+target/
+
+# Bundled third-party binaries (ffmpeg, yt-dlp: too large for GitHub) and built executables
+src-tauri/binaries/
+src-tauri/bridge/
+*.exe
+
+# Images and media — personal images and sounds must never be committed.
+# Only the app's own branding is allowed through (see the exceptions below).
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.bmp
+*.ico
+*.icns
+*.wav
+*.mp3
+*.ogg
+*.flac
+*.webm
+*.mp4
+
+# Exceptions: app logo (needed by the web version), app icons, installer banners
+!src/assets/logo.png
+!src-tauri/icons/**
+!src-tauri/installer-assets/*.bmp
+
+# Local tooling
+.claude/
+
+# Personal working files (kept on disk, never published)
+_claude-context.md
+border-demo.html

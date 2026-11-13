@@ -1,0 +1,21 @@
+{
+  "name": "iceample-v2",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "release": "node scripts/build-release.mjs",
+    "release:check": "node scripts/build-release.mjs --check-only"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "jimp": "^1.6.1",
+    "png-to-ico": "^3.0.1",
+    "to-ico": "^1.1.5"
+  },
+  "dependencies": {
+    "butterchurn": "^2.6.7",
+    "butterchurn-presets": "^2.4.7"
+  }
+}

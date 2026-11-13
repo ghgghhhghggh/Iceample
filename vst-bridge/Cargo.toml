@@ -1,0 +1,26 @@
+[package]
+name = "iceample-vst-bridge"
+version = "2.2.0"
+description = "Iceample 32-bit out-of-process VST host bridge"
+authors = ["Kyliann Chapel"]
+edition = "2021"
+
+# Standalone 32-bit (i686) host process. It loads 32-bit VST plugins that the
+# 64-bit Iceample app cannot load in-process, opens their editor, plays their
+# audio, and receives MIDI from the parent over a localhost TCP socket.
+
+[[bin]]
+name = "iceample-vst-bridge"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 2
+strip = true
+
+[dependencies]
+libloading = "0.8"
+cpal = "0.15"
+crossbeam-channel = "0.5"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "windef", "libloaderapi", "minwindef", "objbase", "errhandlingapi"] }
