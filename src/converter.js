@@ -2,8 +2,15 @@
 
 import { trackRecentFile } from './recent.js'
 import { renderDesktopOnly } from './desktop-only.js'
+import { t } from './i18n.js'
 
 function invoke(cmd, args) { return window.__TAURI__.core.invoke(cmd, args) }
+
+// Fill {placeholders} of a translated string (function replacer: no `$` surprises in file names)
+function fill(s, vars) { return s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m)) }
+
+// "3 converted" / "3 converted, 1 error(s)" + ✓
+function doneMsg(ok, err) { return fill(err ? t('cv_done_ok_err') : t('cv_done_ok'), { ok, err }) + ' ✓' }
 
 async function saveDialog(name, exts) {
   try { return await window.__TAURI__.dialog.save({ defaultPath: name, filters: [{ name: exts[0].toUpperCase(), extensions: exts }] }) }
@@ -76,6 +83,11 @@ function hrow(...els) {
   return r
 }
 
+// Drop zones (file lists, single-PDF pickers) → { add(paths), hl(on) }.
+// OS and library drops are routed to them by initConverter.
+const dropTargets = new WeakMap()
+function dropTarget(el, add, hl) { el.dataset.cvDrop = '1'; dropTargets.set(el, { add, hl }) }
+
 // File list component
 function fileList(accept) {
   const paths = []
@@ -105,7 +117,7 @@ function fileList(accept) {
     if (!paths.length) {
       const ph = document.createElement('div')
       ph.style.cssText = 'font-size:11px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);text-align:center;padding:10px;'
-      ph.textContent = 'Aucun fichier'
+      ph.textContent = t('cv_no_file')
       box.appendChild(ph); return
     }
     paths.forEach((p, i) => {
@@ -129,21 +141,17 @@ function fileList(accept) {
   }
   render()
 
-  // Drag and drop
-  box.addEventListener('dragover', e => { e.preventDefault(); box.style.borderColor = 'var(--color-active)' })
-  box.addEventListener('dragleave', () => { box.style.borderColor = 'var(--win-border)' })
-  box.addEventListener('drop', e => {
-    e.preventDefault(); box.style.borderColor = 'var(--win-border)'
-    for (const f of e.dataTransfer.files) {
-      if (f.path && !paths.includes(f.path)) paths.push(f.path)
-    }
-    render()
-  })
+  function add(arr) { arr.forEach(p => { if (!paths.includes(p)) paths.push(p) }); render() }
+
+  // Drag and drop (OS files / library items, routed by initConverter): accepted types only
+  dropTarget(box,
+    arr => { const ok = arr.filter(p => accept.includes(ext(p))); if (ok.length) add(ok) },
+    on => { box.style.borderColor = on ? 'var(--color-active)' : 'var(--win-border)' })
 
   return {
     el: box,
     get paths() { return paths },
-    add(arr) { arr.forEach(p => { if (!paths.includes(p)) paths.push(p) }); render() },
+    add,
     clear() { paths.length = 0; render() },
   }
 }
@@ -181,24 +189,24 @@ function section(buildFn) {
 // ── Tab: Images ───────────────────────────────────────────────────────────────
 
 const IMG_EXTS = ['png','jpg','jpeg','webp','gif','bmp','tiff','tif','ico','avif']
-const IMG_FMTS = [
-  ['jpg',  'JPG — JPEG compressé'],
-  ['png',  'PNG — Sans perte'],
-  ['webp', 'WebP — Moderne'],
-  ['bmp',  'BMP — Bitmap brut'],
-  ['tiff', 'TIFF — Haute qualité'],
+const IMG_FMTS = () => [
+  ['jpg',  'JPG — ' + t('cv_fmt_jpeg_compressed')],
+  ['png',  'PNG — ' + t('cv_fmt_lossless')],
+  ['webp', 'WebP — ' + t('cv_fmt_modern')],
+  ['bmp',  'BMP — ' + t('cv_fmt_raw_bitmap')],
+  ['tiff', 'TIFF — ' + t('cv_fmt_high_quality')],
   ['gif',  'GIF'],
-  ['ico',  'ICO — Icône Windows'],
+  ['ico',  'ICO — ' + t('cv_fmt_win_icon')],
 ]
 
 function buildImages(wrap) {
   const note = document.createElement('div')
   note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
-  note.textContent = 'Convertissez entre formats d\'image. Glissez-déposez ou ajoutez des fichiers.'
+  note.textContent = t('cv_img_note')
 
   const list = fileList(IMG_EXTS)
 
-  const fmtSel = select(IMG_FMTS)
+  const fmtSel = select(IMG_FMTS())
   const qualSlider = document.createElement('input')
   qualSlider.type = 'range'; qualSlider.min = '10'; qualSlider.max = '100'; qualSlider.value = '90'
   qualSlider.style.cssText = 'flex:1;accent-color:var(--slider-color);'
@@ -207,46 +215,38 @@ function buildImages(wrap) {
   qualLbl.textContent = '90%'
   qualSlider.addEventListener('input', () => { qualLbl.textContent = qualSlider.value + '%' })
 
-  const qualRow = hrow(
-    label('Format cible', fmtSel),
-    label('Qualité JPEG/WebP', Object.assign(document.createElement('div'), {
-      style: 'display:flex;gap:6px;align-items:center;',
-      innerHTML: '',
-    })),
-  )
-  // rebuild quality wrapper inline
   const qualWrap = document.createElement('div')
   qualWrap.style.cssText = 'display:flex;gap:6px;align-items:center;flex:1;'
   qualWrap.append(qualSlider, qualLbl)
 
-  const optRow = hrow(label('Format cible', fmtSel), label('Qualité (JPEG/WebP)', qualWrap))
+  const optRow = hrow(label(t('cv_target_format'), fmtSel), label(t('cv_quality_jpeg_webp'), qualWrap))
 
-  const addBtn = btn('<i class="fa-solid fa-plus"></i> Ajouter des images')
-  const outDirBtn = btn('<i class="fa-solid fa-folder"></i> Dossier de sortie')
+  const addBtn = btn('<i class="fa-solid fa-plus"></i> ' + t('cv_add_images'))
+  const outDirBtn = btn('<i class="fa-solid fa-folder"></i> ' + t('cv_output_folder'))
   let outDir = null
   const outDirLbl = document.createElement('span')
   outDirLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
-  outDirLbl.textContent = 'Même dossier que les fichiers sources'
-  const goBtn = btn('<i class="fa-solid fa-rotate"></i> Convertir tout', true)
+  outDirLbl.textContent = t('cv_same_folder_src')
+  const goBtn = btn('<i class="fa-solid fa-rotate"></i> ' + t('cv_convert_all'), true)
   const status = statusEl()
   const results = resultList()
 
   wrap.append(note, list.el, optRow, hrow(addBtn, outDirBtn, outDirLbl), goBtn, status, results.el)
 
-  addBtn.addEventListener('click', async () => list.add(await pickFiles('Images', IMG_EXTS)))
+  addBtn.addEventListener('click', async () => list.add(await pickFiles(t('cv_images'), IMG_EXTS)))
   outDirBtn.addEventListener('click', async () => {
     const d = await openDirDialog()
     if (d) { outDir = d; outDirLbl.textContent = shortName(d) }
   })
 
   goBtn.addEventListener('click', async () => {
-    if (!list.paths.length) { setStatus(status, 'Ajoutez au moins un fichier.', 'error'); return }
+    if (!list.paths.length) { setStatus(status, t('cv_add_one_file'), 'error'); return }
     goBtn.disabled = true; results.clear()
     const fmt = fmtSel.value
     let ok = 0, err = 0
     for (let i = 0; i < list.paths.length; i++) {
       const p = list.paths[i]
-      setStatus(status, `Conversion ${i+1}/${list.paths.length}…`, 'progress')
+      setStatus(status, fill(t('cv_converting_n'), { i: i + 1, n: list.paths.length }), 'progress')
       const dir = outDir || p.replace(/[\\/][^\\/]+$/, '')
       const outPath = dir + '\\' + stem(p) + '.' + fmt
       try {
@@ -255,10 +255,10 @@ function buildImages(wrap) {
         trackRecentFile(outPath, shortName(outPath))
         ok++
       } catch (e) {
-        results.add(shortName(p) + ' → erreur: ' + String(e).slice(0, 60), false); err++
+        results.add(fill(t('cv_item_error'), { name: shortName(p), err: String(e).slice(0, 60) }), false); err++
       }
     }
-    setStatus(status, `${ok} converti(s)${err ? `, ${err} erreur(s)` : ''} ✓`, ok ? 'success' : 'error')
+    setStatus(status, doneMsg(ok, err), ok ? 'success' : 'error')
     goBtn.disabled = false
   })
 }
@@ -266,14 +266,14 @@ function buildImages(wrap) {
 // ── Tab: Audio ────────────────────────────────────────────────────────────────
 
 const AUDIO_EXTS = ['mp3','wav','flac','ogg','m4a','aac','opus','aiff','aif','wma','mka']
-const AUDIO_FMTS = [
-  ['mp3',  'MP3 — Compatible universel'],
-  ['wav',  'WAV — Sans perte (PCM)'],
-  ['flac', 'FLAC — Lossless compressé'],
-  ['ogg',  'OGG Vorbis — Libre'],
+const AUDIO_FMTS = () => [
+  ['mp3',  'MP3 — ' + t('cv_fmt_universal')],
+  ['wav',  'WAV — ' + t('cv_fmt_lossless_pcm')],
+  ['flac', 'FLAC — ' + t('cv_fmt_lossless_compressed')],
+  ['ogg',  'OGG Vorbis — ' + t('cv_fmt_open')],
   ['m4a',  'M4A — AAC (Apple)'],
   ['aac',  'AAC'],
-  ['opus', 'OPUS — Moderne / VoIP'],
+  ['opus', 'OPUS — ' + t('cv_fmt_modern_voip')],
 ]
 const AUDIO_BITRATES = [['64k','64 kbps'],['96k','96 kbps'],['128k','128 kbps'],['192k','192 kbps'],['256k','256 kbps'],['320k','320 kbps']]
 
@@ -294,14 +294,14 @@ function audioArgs(fmt, bitrate) {
 function buildAudio(wrap) {
   const note = document.createElement('div')
   note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
-  note.textContent = 'Convertissez des fichiers audio entre formats via FFmpeg.'
+  note.textContent = t('cv_audio_note')
 
   const list = fileList(AUDIO_EXTS)
 
-  const fmtSel = select(AUDIO_FMTS)
+  const fmtSel = select(AUDIO_FMTS())
   const brSel  = select(AUDIO_BITRATES)
   brSel.value  = '192k'
-  const qualRow = hrow(label('Format cible', fmtSel), label('Débit', brSel))
+  const qualRow = hrow(label(t('cv_target_format'), fmtSel), label(t('cv_bitrate'), brSel))
 
   // Hide bitrate for lossless formats
   fmtSel.addEventListener('change', () => {
@@ -310,25 +310,25 @@ function buildAudio(wrap) {
     brSel.disabled = lossless
   })
 
-  const addBtn    = btn('<i class="fa-solid fa-plus"></i> Ajouter des fichiers audio')
-  const outDirBtn = btn('<i class="fa-solid fa-folder"></i> Dossier de sortie')
+  const addBtn    = btn('<i class="fa-solid fa-plus"></i> ' + t('cv_add_audio'))
+  const outDirBtn = btn('<i class="fa-solid fa-folder"></i> ' + t('cv_output_folder'))
   let outDir = null
   const outDirLbl = document.createElement('span')
   outDirLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;'
-  outDirLbl.textContent = 'Même dossier'
-  const goBtn = btn('<i class="fa-solid fa-rotate"></i> Convertir tout', true)
+  outDirLbl.textContent = t('cv_same_folder')
+  const goBtn = btn('<i class="fa-solid fa-rotate"></i> ' + t('cv_convert_all'), true)
   const status = statusEl()
   const results = resultList()
 
   wrap.append(note, list.el, qualRow, hrow(addBtn, outDirBtn, outDirLbl), goBtn, status, results.el)
 
-  addBtn.addEventListener('click', async () => list.add(await pickFiles('Audio', AUDIO_EXTS)))
+  addBtn.addEventListener('click', async () => list.add(await pickFiles(t('cv_audio'), AUDIO_EXTS)))
   outDirBtn.addEventListener('click', async () => {
     const d = await openDirDialog(); if (d) { outDir = d; outDirLbl.textContent = shortName(d) }
   })
 
   goBtn.addEventListener('click', async () => {
-    if (!list.paths.length) { setStatus(status, 'Ajoutez au moins un fichier.', 'error'); return }
+    if (!list.paths.length) { setStatus(status, t('cv_add_one_file'), 'error'); return }
     goBtn.disabled = true; results.clear()
     const fmt = fmtSel.value
     const extra = audioArgs(fmt, brSel.value)
@@ -347,7 +347,7 @@ function buildAudio(wrap) {
         results.add(shortName(p) + ': ' + String(e).slice(0,60), false); err++
       }
     }
-    setStatus(status, `${ok} converti(s)${err ? `, ${err} erreur(s)` : ''} ✓`, ok ? 'success' : 'error')
+    setStatus(status, doneMsg(ok, err), ok ? 'success' : 'error')
     goBtn.disabled = false
   })
 }
@@ -355,21 +355,21 @@ function buildAudio(wrap) {
 // ── Tab: Vidéo ────────────────────────────────────────────────────────────────
 
 const VIDEO_EXTS = ['mp4','webm','avi','mov','mkv','m4v','wmv','flv','ts','mts','m2ts']
-const VIDEO_FMTS = [
-  ['mp4',  'MP4 (H.264) — Compatible universel'],
-  ['webm', 'WebM (VP9) — Web'],
+const VIDEO_FMTS = () => [
+  ['mp4',  'MP4 (H.264) — ' + t('cv_fmt_universal')],
+  ['webm', 'WebM (VP9) — ' + t('cv_fmt_web')],
   ['avi',  'AVI'],
   ['mov',  'MOV (QuickTime)'],
   ['mkv',  'MKV (Matroska)'],
-  ['gif',  'GIF animé'],
+  ['gif',  t('cv_fmt_animated_gif')],
 ]
-const VIDEO_QUALITY = [
-  ['fast',   'Rapide (qualité réduite)'],
-  ['medium', 'Standard'],
-  ['slow',   'Haute qualité (lent)'],
+const VIDEO_QUALITY = () => [
+  ['fast',   t('cv_q_fast')],
+  ['medium', t('cv_q_standard')],
+  ['slow',   t('cv_q_slow')],
 ]
-const VIDEO_RES = [
-  ['',      'Résolution originale'],
+const VIDEO_RES = () => [
+  ['',      t('cv_res_original')],
   ['1920:-2','1080p'],
   ['1280:-2','720p'],
   ['854:-2', '480p'],
@@ -407,23 +407,23 @@ function videoArgs(fmt, quality, resVal) {
 function buildVideo(wrap) {
   const note = document.createElement('div')
   note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
-  note.textContent = 'Convertissez des vidéos via FFmpeg. Le GIF animé fonctionne aussi.'
+  note.textContent = t('cv_video_note')
 
   const list = fileList(VIDEO_EXTS)
 
-  const fmtSel  = select(VIDEO_FMTS)
-  const qualSel = select(VIDEO_QUALITY)
+  const fmtSel  = select(VIDEO_FMTS())
+  const qualSel = select(VIDEO_QUALITY())
   qualSel.value = 'medium'
-  const resSel  = select(VIDEO_RES)
-  const optRow  = hrow(label('Format cible', fmtSel), label('Qualité', qualSel), label('Résolution', resSel))
+  const resSel  = select(VIDEO_RES())
+  const optRow  = hrow(label(t('cv_target_format'), fmtSel), label(t('cv_quality'), qualSel), label(t('cv_resolution'), resSel))
 
-  const addBtn    = btn('<i class="fa-solid fa-plus"></i> Ajouter des vidéos')
-  const outDirBtn = btn('<i class="fa-solid fa-folder"></i> Dossier de sortie')
+  const addBtn    = btn('<i class="fa-solid fa-plus"></i> ' + t('cv_add_videos'))
+  const outDirBtn = btn('<i class="fa-solid fa-folder"></i> ' + t('cv_output_folder'))
   let outDir = null
   const outDirLbl = document.createElement('span')
   outDirLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;'
-  outDirLbl.textContent = 'Même dossier'
-  const goBtn = btn('<i class="fa-solid fa-rotate"></i> Convertir tout', true)
+  outDirLbl.textContent = t('cv_same_folder')
+  const goBtn = btn('<i class="fa-solid fa-rotate"></i> ' + t('cv_convert_all'), true)
   const status = statusEl()
   const results = resultList()
 
@@ -436,13 +436,13 @@ function buildVideo(wrap) {
 
   wrap.append(note, list.el, optRow, hrow(addBtn, outDirBtn, outDirLbl), goBtn, status, results.el)
 
-  addBtn.addEventListener('click', async () => list.add(await pickFiles('Vidéos', VIDEO_EXTS)))
+  addBtn.addEventListener('click', async () => list.add(await pickFiles(t('cv_videos'), VIDEO_EXTS)))
   outDirBtn.addEventListener('click', async () => {
     const d = await openDirDialog(); if (d) { outDir = d; outDirLbl.textContent = shortName(d) }
   })
 
   goBtn.addEventListener('click', async () => {
-    if (!list.paths.length) { setStatus(status, 'Ajoutez au moins un fichier.', 'error'); return }
+    if (!list.paths.length) { setStatus(status, t('cv_add_one_file'), 'error'); return }
     goBtn.disabled = true; results.clear()
     const fmt  = fmtSel.value
     const qual = qualSel.value
@@ -451,7 +451,7 @@ function buildVideo(wrap) {
     let ok = 0, err = 0
     for (let i = 0; i < list.paths.length; i++) {
       const p = list.paths[i]
-      setStatus(status, `${i+1}/${list.paths.length} — ${shortName(p)} (peut être long…)`, 'progress')
+      setStatus(status, fill(t('cv_video_progress'), { i: i + 1, n: list.paths.length, name: shortName(p) }), 'progress')
       const dir = outDir || p.replace(/[\\/][^\\/]+$/, '')
       const out = dir + '\\' + stem(p) + '.' + fmt
       try {
@@ -463,7 +463,7 @@ function buildVideo(wrap) {
         results.add(shortName(p) + ': ' + String(e).slice(0,60), false); err++
       }
     }
-    setStatus(status, `${ok} converti(s)${err ? `, ${err} erreur(s)` : ''} ✓`, ok ? 'success' : 'error')
+    setStatus(status, doneMsg(ok, err), ok ? 'success' : 'error')
     goBtn.disabled = false
   })
 }
@@ -471,11 +471,11 @@ function buildVideo(wrap) {
 // ── Tab: Documents ────────────────────────────────────────────────────────────
 
 const DOC_EXTS = ['pdf','docx','doc','odt','rtf','txt','html','htm','epub','pptx','xlsx','csv']
-const DOC_FMTS = [
+const DOC_FMTS = () => [
   ['pdf',  'PDF'],
   ['docx', 'DOCX (Word)'],
   ['odt',  'ODT (LibreOffice)'],
-  ['txt',  'TXT — Texte brut'],
+  ['txt',  'TXT — ' + t('cv_fmt_plain_text')],
   ['html', 'HTML'],
   ['rtf',  'RTF'],
   ['epub', 'EPUB'],
@@ -487,53 +487,55 @@ const DOC_FMTS = [
 function buildDocuments(wrap) {
   const note = document.createElement('div')
   note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
-  note.textContent = 'Conversion de documents via LibreOffice (doit être installé). Supporte PDF, DOCX, ODT, TXT, HTML, EPUB…'
+  note.textContent = t('cv_docs_note')
 
   const sofficePath = { value: null }
 
   // Detect LibreOffice on open
+  const loBadge = document.createElement('div')
+  loBadge.style.cssText = 'font-size:10px;color:var(--text-secondary);'
+  loBadge.textContent = t('cv_lo_detecting')
+
+  // Detect LibreOffice on open (a failing lookup counts as "not found")
   ;(async () => {
     if (!window.__TAURI__) return
-    const p = await invoke('find_libreoffice', {})
+    let p = null
+    try { p = await invoke('find_libreoffice', {}) } catch {}
     sofficePath.value = p || null
     if (p) {
-      loBadge.textContent = '✓ LibreOffice détecté'
+      loBadge.textContent = '✓ ' + t('cv_lo_found')
       loBadge.style.color = 'var(--success)'
     } else {
-      loBadge.textContent = '✗ LibreOffice non trouvé — installez-le sur libreoffice.org'
+      loBadge.textContent = '✗ ' + t('cv_lo_missing')
       loBadge.style.color = 'var(--warning)'
     }
   })()
 
-  const loBadge = document.createElement('div')
-  loBadge.style.cssText = 'font-size:10px;color:var(--text-secondary);'
-  loBadge.textContent = 'Détection de LibreOffice…'
-
   const list = fileList(DOC_EXTS)
 
-  const fmtSel = select(DOC_FMTS)
-  const optRow = hrow(label('Format cible', fmtSel))
+  const fmtSel = select(DOC_FMTS())
+  const optRow = hrow(label(t('cv_target_format'), fmtSel))
 
-  const addBtn    = btn('<i class="fa-solid fa-plus"></i> Ajouter des documents')
-  const outDirBtn = btn('<i class="fa-solid fa-folder"></i> Dossier de sortie')
+  const addBtn    = btn('<i class="fa-solid fa-plus"></i> ' + t('cv_add_docs'))
+  const outDirBtn = btn('<i class="fa-solid fa-folder"></i> ' + t('cv_output_folder'))
   let outDir = null
   const outDirLbl = document.createElement('span')
   outDirLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;'
-  outDirLbl.textContent = 'Même dossier'
-  const goBtn = btn('<i class="fa-solid fa-rotate"></i> Convertir tout', true)
+  outDirLbl.textContent = t('cv_same_folder')
+  const goBtn = btn('<i class="fa-solid fa-rotate"></i> ' + t('cv_convert_all'), true)
   const status = statusEl()
   const results = resultList()
 
   wrap.append(note, loBadge, list.el, optRow, hrow(addBtn, outDirBtn, outDirLbl), goBtn, status, results.el)
 
-  addBtn.addEventListener('click', async () => list.add(await pickFiles('Documents', DOC_EXTS)))
+  addBtn.addEventListener('click', async () => list.add(await pickFiles(t('cv_documents'), DOC_EXTS)))
   outDirBtn.addEventListener('click', async () => {
     const d = await openDirDialog(); if (d) { outDir = d; outDirLbl.textContent = shortName(d) }
   })
 
   goBtn.addEventListener('click', async () => {
-    if (!list.paths.length) { setStatus(status, 'Ajoutez au moins un fichier.', 'error'); return }
-    if (!sofficePath.value) { setStatus(status, 'LibreOffice non trouvé. Installez-le pour cette fonctionnalité.', 'error'); return }
+    if (!list.paths.length) { setStatus(status, t('cv_add_one_file'), 'error'); return }
+    if (!sofficePath.value) { setStatus(status, t('cv_lo_required'), 'error'); return }
     goBtn.disabled = true; results.clear()
     const fmt = fmtSel.value
     let ok = 0, err = 0
@@ -550,7 +552,7 @@ function buildDocuments(wrap) {
         results.add(shortName(p) + ': ' + String(e).slice(0,60), false); err++
       }
     }
-    setStatus(status, `${ok} converti(s)${err ? `, ${err} erreur(s)` : ''} ✓`, ok ? 'success' : 'error')
+    setStatus(status, doneMsg(ok, err), ok ? 'success' : 'error')
     goBtn.disabled = false
   })
 }
@@ -561,30 +563,40 @@ async function pickSinglePdf() {
   const a = await pickFiles('PDF', ['pdf']); return a[0] || null
 }
 
-function pdfFileRow(label_) {
+// onPick(path) runs once the chosen (or dropped) PDF is stored
+function pdfFileRow(label_, onPick) {
   const row = document.createElement('div')
-  row.style.cssText = 'display:flex;gap:8px;align-items:center;'
+  row.style.cssText = 'display:flex;gap:8px;align-items:center;outline-offset:3px;'
   const pickBtn = btn(`<i class="fa-solid fa-file-pdf"></i> ${label_}`)
   const lbl = document.createElement('span')
   lbl.style.cssText = 'flex:1;font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
-  lbl.textContent = 'Aucun fichier'
+  lbl.textContent = t('cv_no_file')
   row.append(pickBtn, lbl)
   let path = null
+  const setPath = p => { path = p; lbl.textContent = shortName(p); onPick?.(p) }
   pickBtn.addEventListener('click', async () => {
     const p = await pickSinglePdf()
-    if (p) { path = p; lbl.textContent = shortName(p) }
+    if (p) setPath(p)
   })
+  dropTarget(row,
+    arr => { const p = arr.find(x => ext(x) === 'pdf'); if (p) setPath(p) },
+    on => { row.style.outline = on ? '1px dashed var(--color-active)' : '' })
   return { el: row, get path() { return path } }
+}
+
+// Page count of a PDF, or null if it can't be read
+async function pdfPageCount(path) {
+  try { return JSON.parse(await invoke('pdf_info', { path })).page_count } catch { return null }
 }
 
 function buildPdf(wrap) {
   // Sub-tabs for PDF operations
   const PDF_SUBTABS = [
-    { id: 'merge',   label: 'Fusionner',    build: buildPdfMerge },
-    { id: 'split',   label: 'Diviser',      build: buildPdfSplit },
-    { id: 'rotate',  label: 'Pivoter',      build: buildPdfRotate },
-    { id: 'reorder', label: 'Réordonner',   build: buildPdfReorder },
-    { id: 'img2pdf', label: 'Images → PDF', build: buildImgToPdf },
+    { id: 'merge',   label: t('cv_pdf_merge'),   build: buildPdfMerge },
+    { id: 'split',   label: t('cv_pdf_split'),   build: buildPdfSplit },
+    { id: 'rotate',  label: t('cv_pdf_rotate'),  build: buildPdfRotate },
+    { id: 'reorder', label: t('cv_pdf_reorder'), build: buildPdfReorder },
+    { id: 'img2pdf', label: t('cv_pdf_img2pdf'), build: buildImgToPdf },
   ]
 
   const tabRow = document.createElement('div')
@@ -598,15 +610,15 @@ function buildPdf(wrap) {
   let activeId = null
   const panels = {}
 
-  for (const t of PDF_SUBTABS) {
+  for (const sub of PDF_SUBTABS) {
     const tb = document.createElement('button')
-    tb.textContent = t.label
+    tb.textContent = sub.label
     tb.style.cssText = BTN + 'background:none;color:var(--text-secondary);border:1px solid transparent;'
 
     const panel = document.createElement('div')
     panel.style.cssText = 'display:none;flex-direction:column;gap:8px;padding-top:10px;'
     content.appendChild(panel)
-    panels[t.id] = { btn: tb, panel }
+    panels[sub.id] = { btn: tb, panel }
 
     tb.addEventListener('click', () => {
       if (activeId) {
@@ -615,12 +627,12 @@ function buildPdf(wrap) {
         panels[activeId].btn.style.borderColor = 'transparent'
         panels[activeId].panel.style.display = 'none'
       }
-      activeId = t.id
+      activeId = sub.id
       tb.style.background = 'color-mix(in srgb, var(--text-primary) 8%, transparent)'
       tb.style.color = 'var(--text-primary,#ddd)'
       tb.style.borderColor = 'var(--win-border-in,#333)'
       panel.style.display = 'flex'
-      if (!panel.dataset.built) { panel.dataset.built = '1'; t.build(panel) }
+      if (!panel.dataset.built) { panel.dataset.built = '1'; sub.build(panel) }
     })
     tabRow.appendChild(tb)
   }
@@ -630,15 +642,15 @@ function buildPdf(wrap) {
 
 function buildPdfMerge(wrap) {
   const list = fileList(['pdf'])
-  const addBtn = btn('<i class="fa-solid fa-plus"></i> Ajouter des PDF')
-  const goBtn  = btn('<i class="fa-solid fa-object-group"></i> Fusionner', true)
+  const addBtn = btn('<i class="fa-solid fa-plus"></i> ' + t('cv_add_pdfs'))
+  const goBtn  = btn('<i class="fa-solid fa-object-group"></i> ' + t('cv_pdf_merge'), true)
   const status = statusEl()
   wrap.append(list.el, hrow(addBtn, goBtn), status)
   addBtn.addEventListener('click', async () => list.add(await pickFiles('PDF', ['pdf'])))
   goBtn.addEventListener('click', async () => {
-    if (list.paths.length < 2) { setStatus(status, 'Minimum 2 PDF.', 'error'); return }
-    const out = await saveDialog('fusion.pdf', ['pdf']); if (!out) return
-    setStatus(status, 'Fusion…', 'progress'); goBtn.disabled = true
+    if (list.paths.length < 2) { setStatus(status, t('cv_min_2_pdf'), 'error'); return }
+    const out = await saveDialog(t('cv_file_merged') + '.pdf', ['pdf']); if (!out) return
+    setStatus(status, t('cv_merging'), 'progress'); goBtn.disabled = true
     try {
       await invoke('pdf_merge', { paths: list.paths, output: out })
       trackRecentFile(out, shortName(out))
@@ -649,50 +661,47 @@ function buildPdfMerge(wrap) {
 }
 
 function buildPdfSplit(wrap) {
-  const picker = pdfFileRow('Choisir un PDF')
   const infoLbl = document.createElement('div')
   infoLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);'
-  const goBtn = btn('<i class="fa-solid fa-scissors"></i> Diviser en pages', true)
+  const picker = pdfFileRow(t('cv_pick_pdf'), async p => {
+    infoLbl.textContent = ''
+    const n = await pdfPageCount(p)
+    if (n == null || picker.path !== p) return   // unreadable, or another file chosen meanwhile
+    infoLbl.textContent = fill(t('cv_n_pages'), { n })
+  })
+  const goBtn = btn('<i class="fa-solid fa-scissors"></i> ' + t('cv_split_pages'), true)
   const status = statusEl()
   wrap.append(picker.el, infoLbl, goBtn, status)
-  picker.el.querySelector('button').addEventListener('click', async () => {
-    if (picker.path) {
-      try {
-        const info = JSON.parse(await invoke('pdf_info', { path: picker.path }))
-        infoLbl.textContent = `${info.page_count} pages`
-      } catch {}
-    }
-  })
   goBtn.addEventListener('click', async () => {
-    if (!picker.path) { setStatus(status, 'Choisissez un PDF.', 'error'); return }
+    if (!picker.path) { setStatus(status, t('cv_choose_pdf_err'), 'error'); return }
     const dir = await openDirDialog(); if (!dir) return
-    setStatus(status, 'Division…', 'progress'); goBtn.disabled = true
+    setStatus(status, t('cv_splitting'), 'progress'); goBtn.disabled = true
     try {
       const out = await invoke('pdf_split', { path: picker.path, outputDir: dir })
       out.forEach(p => trackRecentFile(p, shortName(p)))
-      setStatus(status, `${out.length} fichier(s) créé(s) ✓`, 'success')
+      setStatus(status, fill(t('cv_files_created'), { n: out.length }) + ' ✓', 'success')
     } catch (e) { setStatus(status, String(e), 'error') }
     goBtn.disabled = false
   })
 }
 
 function buildPdfRotate(wrap) {
-  const picker = pdfFileRow('Choisir un PDF')
-  const angleSel = select([['90','90° horaire'],['180','180°'],['270','270° antihoraire']])
+  const picker = pdfFileRow(t('cv_pick_pdf'))
+  const angleSel = select([['90', t('cv_rot_cw')],['180','180°'],['270', t('cv_rot_ccw')]])
   const pagesInp = document.createElement('input')
-  pagesInp.type = 'text'; pagesInp.placeholder = 'Pages (ex: 1,3-5 ou vide = toutes)'
+  pagesInp.type = 'text'; pagesInp.placeholder = t('cv_pages_ph')
   pagesInp.style.cssText = INP + 'flex:1;'
-  const goBtn = btn('<i class="fa-solid fa-rotate-right"></i> Pivoter', true)
+  const goBtn = btn('<i class="fa-solid fa-rotate-right"></i> ' + t('cv_pdf_rotate'), true)
   const status = statusEl()
-  wrap.append(picker.el, hrow(label('Angle', angleSel), label('Pages', pagesInp)), goBtn, status)
+  wrap.append(picker.el, hrow(label(t('cv_angle'), angleSel), label(t('cv_pages'), pagesInp)), goBtn, status)
   function parsePages(s) {
     if (!s.trim()) return []
     const r = []; for (const p of s.split(',')) { const t = p.trim(); if (t.includes('-')) { const [a,b]=t.split('-').map(Number); for(let i=a;i<=b;i++) r.push(i) } else { const n=parseInt(t); if(!isNaN(n)) r.push(n) } } return [...new Set(r)].sort((a,b)=>a-b)
   }
   goBtn.addEventListener('click', async () => {
-    if (!picker.path) { setStatus(status, 'Choisissez un PDF.', 'error'); return }
-    const out = await saveDialog(stem(picker.path) + '_pivote.pdf', ['pdf']); if (!out) return
-    setStatus(status, 'Rotation…', 'progress'); goBtn.disabled = true
+    if (!picker.path) { setStatus(status, t('cv_choose_pdf_err'), 'error'); return }
+    const out = await saveDialog(stem(picker.path) + '_' + t('cv_suffix_rotated') + '.pdf', ['pdf']); if (!out) return
+    setStatus(status, t('cv_rotating'), 'progress'); goBtn.disabled = true
     try {
       await invoke('pdf_rotate', { path: picker.path, output: out, pages: parsePages(pagesInp.value), degrees: parseInt(angleSel.value) })
       trackRecentFile(out, shortName(out))
@@ -703,23 +712,24 @@ function buildPdfRotate(wrap) {
 }
 
 function buildPdfReorder(wrap) {
-  const picker = pdfFileRow('Choisir un PDF')
   const infoLbl = document.createElement('div'); infoLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);'
-  const orderInp = document.createElement('input'); orderInp.type='text'; orderInp.placeholder='Ordre (ex: 3,1,2,4)'; orderInp.style.cssText=INP+'width:100%;box-sizing:border-box;'
-  const goBtn = btn('<i class="fa-solid fa-sort"></i> Réordonner', true)
-  const status = statusEl()
-  wrap.append(picker.el, infoLbl, label('Ordre des pages', orderInp), goBtn, status)
-  picker.el.querySelector('button').addEventListener('click', async () => {
-    if (picker.path) {
-      try { const info = JSON.parse(await invoke('pdf_info',{path:picker.path})); infoLbl.textContent=`${info.page_count} pages`; orderInp.value=Array.from({length:info.page_count},(_,i)=>i+1).join(',') } catch {}
-    }
+  const orderInp = document.createElement('input'); orderInp.type='text'; orderInp.placeholder=t('cv_order_ph'); orderInp.style.cssText=INP+'width:100%;box-sizing:border-box;'
+  const picker = pdfFileRow(t('cv_pick_pdf'), async p => {
+    infoLbl.textContent = ''
+    const n = await pdfPageCount(p)
+    if (n == null || picker.path !== p) return   // unreadable, or another file chosen meanwhile
+    infoLbl.textContent = fill(t('cv_n_pages'), { n })
+    orderInp.value = Array.from({ length: n }, (_, i) => i + 1).join(',')
   })
+  const goBtn = btn('<i class="fa-solid fa-sort"></i> ' + t('cv_pdf_reorder'), true)
+  const status = statusEl()
+  wrap.append(picker.el, infoLbl, label(t('cv_page_order'), orderInp), goBtn, status)
   goBtn.addEventListener('click', async () => {
-    if (!picker.path) { setStatus(status,'Choisissez un PDF.','error'); return }
+    if (!picker.path) { setStatus(status,t('cv_choose_pdf_err'),'error'); return }
     const order = orderInp.value.split(',').map(s=>parseInt(s.trim())).filter(n=>!isNaN(n))
-    if (!order.length) { setStatus(status,'Ordre invalide.','error'); return }
-    const out = await saveDialog(stem(picker.path)+'_reordonné.pdf',['pdf']); if (!out) return
-    setStatus(status,'Réorganisation…','progress'); goBtn.disabled=true
+    if (!order.length) { setStatus(status,t('cv_invalid_order'),'error'); return }
+    const out = await saveDialog(stem(picker.path)+'_'+t('cv_suffix_reordered')+'.pdf',['pdf']); if (!out) return
+    setStatus(status,t('cv_reordering'),'progress'); goBtn.disabled=true
     try {
       await invoke('pdf_reorder',{path:picker.path,output:out,order})
       trackRecentFile(out, shortName(out))
@@ -731,15 +741,15 @@ function buildPdfReorder(wrap) {
 
 function buildImgToPdf(wrap) {
   const list = fileList(['png','jpg','jpeg','webp','gif','bmp','tiff'])
-  const addBtn = btn('<i class="fa-solid fa-images"></i> Ajouter des images')
-  const goBtn  = btn('<i class="fa-solid fa-file-pdf"></i> Créer le PDF', true)
+  const addBtn = btn('<i class="fa-solid fa-images"></i> ' + t('cv_add_images'))
+  const goBtn  = btn('<i class="fa-solid fa-file-pdf"></i> ' + t('cv_create_pdf'), true)
   const status = statusEl()
   wrap.append(list.el, hrow(addBtn, goBtn), status)
-  addBtn.addEventListener('click', async () => list.add(await pickFiles('Images', ['png','jpg','jpeg','webp','gif','bmp'])))
+  addBtn.addEventListener('click', async () => list.add(await pickFiles(t('cv_images'), ['png','jpg','jpeg','webp','gif','bmp'])))
   goBtn.addEventListener('click', async () => {
-    if (!list.paths.length) { setStatus(status,'Ajoutez des images.','error'); return }
-    const out = await saveDialog('images.pdf',['pdf']); if (!out) return
-    setStatus(status,'Création du PDF…','progress'); goBtn.disabled=true
+    if (!list.paths.length) { setStatus(status,t('cv_need_images'),'error'); return }
+    const out = await saveDialog(t('cv_file_images')+'.pdf',['pdf']); if (!out) return
+    setStatus(status,t('cv_creating_pdf'),'progress'); goBtn.disabled=true
     try {
       await invoke('images_to_pdf',{paths:list.paths,output:out})
       trackRecentFile(out, shortName(out))
@@ -760,10 +770,10 @@ export function initConverter(body) {
   body.style.cssText = 'display:flex;flex-direction:column;height:100%;background:var(--surface);font-size:12px;'
 
   const TABS = [
-    { id: 'images', label: 'Images',     icon: 'fa-solid fa-image',         build: buildImages },
-    { id: 'audio',  label: 'Audio',      icon: 'fa-solid fa-music',          build: buildAudio },
-    { id: 'video',  label: 'Vidéo',      icon: 'fa-solid fa-film',           build: buildVideo },
-    { id: 'docs',   label: 'Documents',  icon: 'fa-solid fa-file-lines',     build: buildDocuments },
+    { id: 'images', label: t('cv_images'),    icon: 'fa-solid fa-image',         build: buildImages },
+    { id: 'audio',  label: t('cv_audio'),     icon: 'fa-solid fa-music',          build: buildAudio },
+    { id: 'video',  label: t('cv_video'),     icon: 'fa-solid fa-film',           build: buildVideo },
+    { id: 'docs',   label: t('cv_documents'), icon: 'fa-solid fa-file-lines',     build: buildDocuments },
     { id: 'pdf',    label: 'PDF',        icon: 'fa-solid fa-file-pdf',       build: buildPdf },
   ]
 
@@ -810,4 +820,68 @@ export function initConverter(body) {
 
   body.append(tabBar, contentArea)
   panels[TABS[0].id].btn.click()
+
+  // ── Drops: OS files (Tauri) + library drags ─────────────────────────────────
+  // Target = drop zone under the pointer, else the one in the visible tab.
+  const targetAt = el => {
+    const hit = el?.closest?.('[data-cv-drop]')
+    if (hit && body.contains(hit)) return hit
+    return [...body.querySelectorAll('[data-cv-drop]')].find(z => z.getClientRects().length) || null
+  }
+  // Element under a Tauri drag position (physical px); undefined = position unusable
+  const elAt = pos => {
+    if (!pos) return undefined
+    const x = pos.x / devicePixelRatio, y = pos.y / devicePixelRatio
+    if (!(x >= 0 && y >= 0 && x <= innerWidth && y <= innerHeight)) return undefined
+    return document.elementFromPoint(x, y) || undefined
+  }
+  let lit = null
+  const light = z => {
+    if (lit === z) return
+    if (lit) dropTargets.get(lit)?.hl(false)
+    lit = z
+    if (z) dropTargets.get(z)?.hl(true)
+  }
+
+  // onDragDropEvent is webview-GLOBAL: unlisten at teardown, or every open of
+  // this tool leaves another listener holding a dead body.
+  let dead = false
+  let dropUnlisten = null
+  ;(async () => {
+    try {
+      const wv = window.__TAURI__.webview?.getCurrentWebview?.()
+      if (!wv?.onDragDropEvent) return
+      const un = await wv.onDragDropEvent(e => {
+        if (!document.contains(body)) return
+        const { type, paths, position } = e.payload || {}
+        if (type === 'leave') { light(null); return }
+        const under = elAt(position)
+        // Over another tool window → not for this one
+        const zone = under && !body.contains(under) ? null : targetAt(under)
+        if (type === 'enter' || type === 'over') light(zone)
+        else if (type === 'drop') {
+          light(null)
+          if (zone && paths?.length) dropTargets.get(zone)?.add(paths)
+        }
+      })
+      if (dead) un()   // closed while awaiting
+      else dropUnlisten = un
+    } catch {}
+  })()
+
+  // Library drag (item dropped on this tool)
+  body.addEventListener('iceample-drop', e => {
+    const f = e.detail?.file
+    if (!f?.path) return
+    const zone = targetAt(e.target)
+    if (zone) dropTargets.get(zone)?.add([f.path])
+  })
+
+  const cleanObs = new MutationObserver(() => {
+    if (document.contains(body)) return
+    dead = true
+    dropUnlisten?.(); dropUnlisten = null
+    cleanObs.disconnect()
+  })
+  cleanObs.observe(document.body, { childList: true, subtree: true })
 }

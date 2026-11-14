@@ -1,5 +1,6 @@
 // pdftool.js — Suite d'outils PDF (fusionner, diviser, pivoter, réordonner, images↔PDF, DOCX/ODT↔PDF)
 import { renderDesktopOnly } from './desktop-only.js'
+import { t } from './i18n.js'
 
 function invoke(cmd, args) {
   return window.__TAURI__.core.invoke(cmd, args)
@@ -14,7 +15,7 @@ async function saveDialog(defaultName, filters) {
 async function pickPdfFiles() {
   try {
     const paths = await invoke('pick_files_with_filter', {
-      filterName: 'Fichiers PDF', extensions: ['pdf']
+      filterName: t('pdf_filter_pdfs'), extensions: ['pdf']
     })
     return paths || []
   } catch { return [] }
@@ -23,7 +24,7 @@ async function pickPdfFiles() {
 async function pickImageFiles() {
   try {
     const paths = await invoke('pick_files_with_filter', {
-      filterName: 'Images', extensions: ['png','jpg','jpeg','gif','webp','bmp','tiff','tif']
+      filterName: t('pdf_filter_images'), extensions: ['png','jpg','jpeg','gif','webp','bmp','tiff','tif']
     })
     return paths || []
   } catch { return [] }
@@ -32,7 +33,7 @@ async function pickImageFiles() {
 async function pickDocFiles() {
   try {
     const paths = await invoke('pick_files_with_filter', {
-      filterName: 'Documents Office', extensions: ['docx','doc','odt','rtf','xlsx','pptx']
+      filterName: t('pdf_filter_office'), extensions: ['docx','doc','odt','rtf','xlsx','pptx']
     })
     return paths || []
   } catch { return [] }
@@ -41,7 +42,7 @@ async function pickDocFiles() {
 async function pickSinglePdf() {
   try {
     const paths = await invoke('pick_files_with_filter', {
-      filterName: 'Fichier PDF', extensions: ['pdf']
+      filterName: t('pdf_filter_pdf'), extensions: ['pdf']
     })
     return paths && paths[0] ? paths[0] : null
   } catch { return null }
@@ -51,10 +52,13 @@ function shortName(path) {
   return path ? path.replace(/\\/g, '/').split('/').pop() : ''
 }
 
+// Page-list separators: ASCII, fullwidth (，), ideographic (、) and Arabic (،) commas, or spaces
+const PAGE_SEP = /[,，、،\s]+/
+
 function fileItem(path, onRemove) {
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 8px;background:var(--surface2,#1a1a1a);border-radius:5px;margin-bottom:4px;'
-  row.innerHTML = `<i class="fa-solid fa-file-pdf" style="color:#e05252;font-size:13px;"></i>`
+  row.innerHTML = `<i class="fa-solid fa-file-pdf" style="color:var(--danger);font-size:13px;"></i>`
   const name = document.createElement('span')
   name.style.cssText = 'flex:1;font-size:11px;color:var(--text-primary,#ddd);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
   name.title = path
@@ -107,7 +111,7 @@ function fileListBox() {
   box.style.cssText = 'border:1px dashed var(--win-border);border-radius:6px;padding:8px;min-height:60px;max-height:200px;overflow-y:auto;'
   const empty = document.createElement('div')
   empty.style.cssText = 'font-size:11px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);text-align:center;padding:16px;'
-  empty.textContent = 'Aucun fichier'
+  empty.textContent = t('pdf_no_file')
   box.appendChild(empty)
 
   const paths = []
@@ -136,13 +140,13 @@ function buildMerge(wrap) {
 
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:8px;'
-  const addBtn = btn('Ajouter des PDF', 'fa-solid fa-plus')
-  const goBtn  = btn('Fusionner', 'fa-solid fa-object-group', true)
+  const addBtn = btn(t('pdf_add_pdfs'), 'fa-solid fa-plus')
+  const goBtn  = btn(t('pdf_merge'), 'fa-solid fa-object-group', true)
   row.append(addBtn, goBtn)
 
   const note = document.createElement('div')
   note.style.cssText = 'font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);'
-  note.textContent = 'Les fichiers seront fusionnés dans l\'ordre affiché.'
+  note.textContent = t('pdf_merge_note')
 
   const status = statusDiv()
   wrap.append(row, note, status)
@@ -153,15 +157,15 @@ function buildMerge(wrap) {
   })
 
   goBtn.addEventListener('click', async () => {
-    if (list.paths.length < 2) { setStatus(status, 'Sélectionnez au moins 2 PDF.', 'error'); return }
-    const out = await saveDialog('fusion.pdf', [{ name: 'PDF', extensions: ['pdf'] }])
+    if (list.paths.length < 2) { setStatus(status, t('pdf_err_min2'), 'error'); return }
+    const out = await saveDialog(t('pdf_fname_merged') + '.pdf', [{ name: 'PDF', extensions: ['pdf'] }])
     if (!out) return
-    setStatus(status, 'Fusion en cours…')
+    setStatus(status, t('pdf_merging'))
     goBtn.disabled = true
     try {
       await invoke('pdf_merge', { paths: list.paths, output: out })
-      setStatus(status, `Fusionné → ${shortName(out)} ✓`, 'success')
-    } catch (e) { setStatus(status, String(e), 'error') }
+      setStatus(status, t('pdf_merged').replace('{file}', () => shortName(out)) + ' ✓', 'success')
+    } catch (e) { setStatus(status, t('pdf_error') + ' ' + String(e), 'error') }
     goBtn.disabled = false
   })
 }
@@ -170,17 +174,17 @@ function buildMerge(wrap) {
 function buildSplit(wrap) {
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:8px;align-items:center;'
-  const pickBtn = btn('Choisir un PDF', 'fa-solid fa-file-pdf')
+  const pickBtn = btn(t('pdf_pick_pdf'), 'fa-solid fa-file-pdf')
   const fileLbl = document.createElement('span')
   fileLbl.style.cssText = 'flex:1;font-size:11px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
-  fileLbl.textContent = 'Aucun fichier'
+  fileLbl.textContent = t('pdf_no_file')
   row.append(pickBtn, fileLbl)
 
   let pdfPath = null
   const infoLbl = document.createElement('div')
   infoLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);'
 
-  const goBtn = btn('Diviser en pages individuelles', 'fa-solid fa-scissors', true)
+  const goBtn = btn(t('pdf_split_go'), 'fa-solid fa-scissors', true)
   const status = statusDiv()
   wrap.append(row, infoLbl, goBtn, status)
 
@@ -191,21 +195,21 @@ function buildSplit(wrap) {
     fileLbl.textContent = shortName(p)
     try {
       const info = JSON.parse(await invoke('pdf_info', { path: p }))
-      infoLbl.textContent = `${info.page_count} page(s) — ${Math.round(info.width)}×${Math.round(info.height)} pt`
+      infoLbl.textContent = `${t('pdf_pages_n').replace('{n}', info.page_count)} — ${Math.round(info.width)}×${Math.round(info.height)} pt`
     } catch { infoLbl.textContent = '' }
   })
 
   goBtn.addEventListener('click', async () => {
-    if (!pdfPath) { setStatus(status, 'Choisissez un PDF.', 'error'); return }
+    if (!pdfPath) { setStatus(status, t('pdf_err_pick'), 'error'); return }
     const { dialog } = window.__TAURI__
-    const dir = await dialog.open({ directory: true, title: 'Dossier de destination' }).catch(() => null)
+    const dir = await dialog.open({ directory: true, title: t('pdf_dest_folder') }).catch(() => null)
     if (!dir) return
-    setStatus(status, 'Division en cours…')
+    setStatus(status, t('pdf_splitting'))
     goBtn.disabled = true
     try {
       const out = await invoke('pdf_split', { path: pdfPath, outputDir: dir })
-      setStatus(status, `${out.length} fichier(s) créé(s) dans ${shortName(dir)} ✓`, 'success')
-    } catch (e) { setStatus(status, String(e), 'error') }
+      setStatus(status, t('pdf_split_done').replace('{n}', out.length).replace('{dir}', () => shortName(dir)) + ' ✓', 'success')
+    } catch (e) { setStatus(status, t('pdf_error') + ' ' + String(e), 'error') }
     goBtn.disabled = false
   })
 }
@@ -214,10 +218,10 @@ function buildSplit(wrap) {
 function buildRotate(wrap) {
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:8px;align-items:center;'
-  const pickBtn = btn('Choisir un PDF', 'fa-solid fa-file-pdf')
+  const pickBtn = btn(t('pdf_pick_pdf'), 'fa-solid fa-file-pdf')
   const fileLbl = document.createElement('span')
   fileLbl.style.cssText = 'flex:1;font-size:11px;color:var(--text-secondary);'
-  fileLbl.textContent = 'Aucun fichier'
+  fileLbl.textContent = t('pdf_no_file')
   row.append(pickBtn, fileLbl)
 
   let pdfPath = null
@@ -227,19 +231,19 @@ function buildRotate(wrap) {
 
   const angleSelect = document.createElement('select')
   angleSelect.style.cssText = 'background:var(--surface2,#1a1a1a);border:1px solid var(--win-border);color:var(--text-primary);border-radius:5px;padding:5px 8px;font-size:12px;'
-  for (const [label, val] of [['90° (horaire)', '90'], ['180°', '180'], ['270° (antihoraire)', '270']]) {
+  for (const [label, val] of [[t('pdf_rot_90'), '90'], ['180°', '180'], [t('pdf_rot_270'), '270']]) {
     const opt = document.createElement('option')
     opt.value = val; opt.textContent = label
     angleSelect.appendChild(opt)
   }
 
   const pageInput = document.createElement('input')
-  pageInput.type = 'text'; pageInput.placeholder = 'Pages (ex: 1,3-5 ou vide = toutes)'
+  pageInput.type = 'text'; pageInput.placeholder = t('pdf_pages_ph')
   pageInput.style.cssText = 'flex:1;background:var(--surface2,#1a1a1a);border:1px solid var(--win-border);color:var(--text-primary);border-radius:5px;padding:5px 8px;font-size:11px;outline:none;'
 
   optRow.append(angleSelect, pageInput)
 
-  const goBtn = btn('Pivoter et enregistrer', 'fa-solid fa-rotate-right', true)
+  const goBtn = btn(t('pdf_rotate_go'), 'fa-solid fa-rotate-right', true)
   const status = statusDiv()
   wrap.append(row, optRow, goBtn, status)
 
@@ -251,7 +255,7 @@ function buildRotate(wrap) {
   function parsePages(str) {
     if (!str.trim()) return []
     const pages = []
-    for (const part of str.split(',')) {
+    for (const part of str.replace(/\s*-\s*/g, '-').split(PAGE_SEP)) {
       const trimmed = part.trim()
       if (trimmed.includes('-')) {
         const [a, b] = trimmed.split('-').map(Number)
@@ -265,10 +269,10 @@ function buildRotate(wrap) {
   }
 
   goBtn.addEventListener('click', async () => {
-    if (!pdfPath) { setStatus(status, 'Choisissez un PDF.', 'error'); return }
-    const out = await saveDialog(shortName(pdfPath).replace('.pdf', '_pivote.pdf'), [{ name: 'PDF', extensions: ['pdf'] }])
+    if (!pdfPath) { setStatus(status, t('pdf_err_pick'), 'error'); return }
+    const out = await saveDialog(shortName(pdfPath).replace(/\.pdf$/i, '') + '_' + t('pdf_fname_rotated') + '.pdf', [{ name: 'PDF', extensions: ['pdf'] }])
     if (!out) return
-    setStatus(status, 'Rotation en cours…')
+    setStatus(status, t('pdf_rotating'))
     goBtn.disabled = true
     try {
       await invoke('pdf_rotate', {
@@ -276,8 +280,8 @@ function buildRotate(wrap) {
         pages: parsePages(pageInput.value),
         degrees: parseInt(angleSelect.value),
       })
-      setStatus(status, `Pivoté → ${shortName(out)} ✓`, 'success')
-    } catch (e) { setStatus(status, String(e), 'error') }
+      setStatus(status, t('pdf_rotated').replace('{file}', () => shortName(out)) + ' ✓', 'success')
+    } catch (e) { setStatus(status, t('pdf_error') + ' ' + String(e), 'error') }
     goBtn.disabled = false
   })
 }
@@ -286,27 +290,27 @@ function buildRotate(wrap) {
 function buildReorder(wrap) {
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:8px;align-items:center;'
-  const pickBtn = btn('Choisir un PDF', 'fa-solid fa-file-pdf')
+  const pickBtn = btn(t('pdf_pick_pdf'), 'fa-solid fa-file-pdf')
   const fileLbl = document.createElement('span')
   fileLbl.style.cssText = 'flex:1;font-size:11px;color:var(--text-secondary);'
-  fileLbl.textContent = 'Aucun fichier'
+  fileLbl.textContent = t('pdf_no_file')
   row.append(pickBtn, fileLbl)
 
   const infoLbl = document.createElement('div')
   infoLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);'
 
   const orderInput = document.createElement('input')
-  orderInput.type = 'text'; orderInput.placeholder = 'Ordre (ex: 3,1,2,4)'
+  orderInput.type = 'text'; orderInput.placeholder = t('pdf_order_ph')
   orderInput.style.cssText = 'background:var(--surface2,#1a1a1a);border:1px solid var(--win-border);color:var(--text-primary);border-radius:5px;padding:6px 10px;font-size:12px;outline:none;width:100%;box-sizing:border-box;'
 
   const orderNote = document.createElement('div')
   orderNote.style.cssText = 'font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);'
-  orderNote.textContent = 'Entrez les numéros de pages dans le nouvel ordre, séparés par des virgules.'
+  orderNote.textContent = t('pdf_order_note')
 
   let pdfPath = null
   let pageCount = 0
 
-  const goBtn = btn('Réordonner et enregistrer', 'fa-solid fa-sort', true)
+  const goBtn = btn(t('pdf_reorder_go'), 'fa-solid fa-sort', true)
   const status = statusDiv()
   wrap.append(row, infoLbl, orderNote, orderInput, goBtn, status)
 
@@ -317,23 +321,23 @@ function buildReorder(wrap) {
     try {
       const info = JSON.parse(await invoke('pdf_info', { path: p }))
       pageCount = info.page_count
-      infoLbl.textContent = `${pageCount} page(s)`
+      infoLbl.textContent = t('pdf_pages_n').replace('{n}', pageCount)
       orderInput.value = Array.from({length: pageCount}, (_, i) => i + 1).join(',')
     } catch {}
   })
 
   goBtn.addEventListener('click', async () => {
-    if (!pdfPath) { setStatus(status, 'Choisissez un PDF.', 'error'); return }
-    const order = orderInput.value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n))
-    if (!order.length) { setStatus(status, 'Entrez un ordre valide.', 'error'); return }
-    const out = await saveDialog(shortName(pdfPath).replace('.pdf', '_reordonné.pdf'), [{ name: 'PDF', extensions: ['pdf'] }])
+    if (!pdfPath) { setStatus(status, t('pdf_err_pick'), 'error'); return }
+    const order = orderInput.value.split(PAGE_SEP).map(s => parseInt(s.trim())).filter(n => !isNaN(n))
+    if (!order.length) { setStatus(status, t('pdf_err_order'), 'error'); return }
+    const out = await saveDialog(shortName(pdfPath).replace(/\.pdf$/i, '') + '_' + t('pdf_fname_reordered') + '.pdf', [{ name: 'PDF', extensions: ['pdf'] }])
     if (!out) return
-    setStatus(status, 'Réorganisation en cours…')
+    setStatus(status, t('pdf_reordering'))
     goBtn.disabled = true
     try {
       await invoke('pdf_reorder', { path: pdfPath, output: out, order })
-      setStatus(status, `Réordonné → ${shortName(out)} ✓`, 'success')
-    } catch (e) { setStatus(status, String(e), 'error') }
+      setStatus(status, t('pdf_reordered').replace('{file}', () => shortName(out)) + ' ✓', 'success')
+    } catch (e) { setStatus(status, t('pdf_error') + ' ' + String(e), 'error') }
     goBtn.disabled = false
   })
 }
@@ -342,12 +346,12 @@ function buildReorder(wrap) {
 function buildImagesToPdf(wrap) {
   const note = document.createElement('div')
   note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
-  note.textContent = 'Créez un PDF à partir d\'images (PNG, JPG, GIF, WebP). Chaque image devient une page.'
+  note.textContent = t('pdf_img2pdf_note')
 
   const list = fileListBox()
 
-  const addBtn = btn('Ajouter des images', 'fa-solid fa-images')
-  const goBtn  = btn('Créer le PDF', 'fa-solid fa-file-export', true)
+  const addBtn = btn(t('pdf_add_images'), 'fa-solid fa-images')
+  const goBtn  = btn(t('pdf_create'), 'fa-solid fa-file-export', true)
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:8px;'
   row.append(addBtn, goBtn)
@@ -361,15 +365,15 @@ function buildImagesToPdf(wrap) {
   })
 
   goBtn.addEventListener('click', async () => {
-    if (!list.paths.length) { setStatus(status, 'Ajoutez au moins une image.', 'error'); return }
-    const out = await saveDialog('images.pdf', [{ name: 'PDF', extensions: ['pdf'] }])
+    if (!list.paths.length) { setStatus(status, t('pdf_err_min_image'), 'error'); return }
+    const out = await saveDialog(t('pdf_fname_images') + '.pdf', [{ name: 'PDF', extensions: ['pdf'] }])
     if (!out) return
-    setStatus(status, 'Conversion en cours…')
+    setStatus(status, t('pdf_converting'))
     goBtn.disabled = true
     try {
       await invoke('images_to_pdf', { paths: list.paths, output: out })
-      setStatus(status, `PDF créé → ${shortName(out)} ✓`, 'success')
-    } catch (e) { setStatus(status, String(e), 'error') }
+      setStatus(status, t('pdf_created').replace('{file}', () => shortName(out)) + ' ✓', 'success')
+    } catch (e) { setStatus(status, t('pdf_error') + ' ' + String(e), 'error') }
     goBtn.disabled = false
   })
 }
@@ -378,19 +382,19 @@ function buildImagesToPdf(wrap) {
 function buildPdfToImages(wrap) {
   const note = document.createElement('div')
   note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
-  note.textContent = 'Convertit chaque page d\'un PDF en image PNG (nécessite LibreOffice).'
+  note.textContent = t('pdf_pdf2img_note')
 
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:8px;align-items:center;'
-  const pickBtn = btn('Choisir un PDF', 'fa-solid fa-file-pdf')
+  const pickBtn = btn(t('pdf_pick_pdf'), 'fa-solid fa-file-pdf')
   const fileLbl = document.createElement('span')
   fileLbl.style.cssText = 'flex:1;font-size:11px;color:var(--text-secondary);'
-  fileLbl.textContent = 'Aucun fichier'
+  fileLbl.textContent = t('pdf_no_file')
   row.append(pickBtn, fileLbl)
 
   let pdfPath = null
 
-  const goBtn = btn('Convertir en images', 'fa-solid fa-images', true)
+  const goBtn = btn(t('pdf_to_images_go'), 'fa-solid fa-images', true)
   const status = statusDiv()
   wrap.append(note, row, goBtn, status)
 
@@ -400,18 +404,18 @@ function buildPdfToImages(wrap) {
   })
 
   goBtn.addEventListener('click', async () => {
-    if (!pdfPath) { setStatus(status, 'Choisissez un PDF.', 'error'); return }
+    if (!pdfPath) { setStatus(status, t('pdf_err_pick'), 'error'); return }
     const soffice = await invoke('find_libreoffice', {})
-    if (!soffice) { setStatus(status, 'LibreOffice non trouvé. Installez LibreOffice pour cette fonctionnalité.', 'error'); return }
+    if (!soffice) { setStatus(status, t('pdf_err_lo_install'), 'error'); return }
     const { dialog } = window.__TAURI__
-    const dir = await dialog.open({ directory: true, title: 'Dossier de destination' }).catch(() => null)
+    const dir = await dialog.open({ directory: true, title: t('pdf_dest_folder') }).catch(() => null)
     if (!dir) return
-    setStatus(status, 'Conversion en cours (LibreOffice)…')
+    setStatus(status, t('pdf_converting_lo'))
     goBtn.disabled = true
     try {
-      const out = await invoke('convert_with_libreoffice', { soffice, input: pdfPath, outputDir: dir, format: 'png' })
-      setStatus(status, `Converti → ${shortName(dir)} ✓`, 'success')
-    } catch (e) { setStatus(status, String(e), 'error') }
+      await invoke('convert_with_libreoffice', { soffice, input: pdfPath, outputDir: dir, format: 'png' })
+      setStatus(status, t('pdf_converted').replace('{file}', () => shortName(dir)) + ' ✓', 'success')
+    } catch (e) { setStatus(status, t('pdf_error') + ' ' + String(e), 'error') }
     goBtn.disabled = false
   })
 }
@@ -420,12 +424,12 @@ function buildPdfToImages(wrap) {
 function buildDocToPdf(wrap) {
   const note = document.createElement('div')
   note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
-  note.textContent = 'Convertit des documents Word/ODT en PDF via LibreOffice (doit être installé).'
+  note.textContent = t('pdf_doc2pdf_note')
 
   const list = fileListBox()
 
-  const addBtn = btn('Ajouter des documents', 'fa-solid fa-file-word')
-  const goBtn  = btn('Convertir en PDF', 'fa-solid fa-file-pdf', true)
+  const addBtn = btn(t('pdf_add_docs'), 'fa-solid fa-file-word')
+  const goBtn  = btn(t('pdf_to_pdf_go'), 'fa-solid fa-file-pdf', true)
   const rowBtns = document.createElement('div')
   rowBtns.style.cssText = 'display:flex;gap:8px;'
   rowBtns.append(addBtn, goBtn)
@@ -439,13 +443,13 @@ function buildDocToPdf(wrap) {
   })
 
   goBtn.addEventListener('click', async () => {
-    if (!list.paths.length) { setStatus(status, 'Ajoutez au moins un document.', 'error'); return }
+    if (!list.paths.length) { setStatus(status, t('pdf_err_min_doc'), 'error'); return }
     const soffice = await invoke('find_libreoffice', {})
-    if (!soffice) { setStatus(status, 'LibreOffice non trouvé.', 'error'); return }
+    if (!soffice) { setStatus(status, t('pdf_err_lo'), 'error'); return }
     const { dialog } = window.__TAURI__
-    const dir = await dialog.open({ directory: true, title: 'Dossier de destination' }).catch(() => null)
+    const dir = await dialog.open({ directory: true, title: t('pdf_dest_folder') }).catch(() => null)
     if (!dir) return
-    setStatus(status, `Conversion de ${list.paths.length} fichier(s)…`)
+    setStatus(status, t('pdf_converting_n').replace('{n}', list.paths.length))
     goBtn.disabled = true
     let ok = 0, err = 0
     for (const p of list.paths) {
@@ -454,7 +458,9 @@ function buildDocToPdf(wrap) {
         ok++
       } catch { err++ }
     }
-    setStatus(status, `${ok} converti(s)${err ? `, ${err} erreur(s)` : ''} → ${shortName(dir)} ✓`, ok ? 'success' : 'error')
+    const doneMsg = (err ? t('pdf_doc_done_err') : t('pdf_doc_done'))
+      .replace('{ok}', ok).replace('{err}', err).replace('{dir}', () => shortName(dir))
+    setStatus(status, ok ? doneMsg + ' ✓' : doneMsg, ok ? 'success' : 'error')
     goBtn.disabled = false
   })
 }
@@ -463,14 +469,14 @@ function buildDocToPdf(wrap) {
 function buildPdfToDoc(wrap) {
   const note = document.createElement('div')
   note.style.cssText = 'font-size:11px;color:var(--text-secondary);'
-  note.textContent = 'Convertit un PDF en document éditable (DOCX ou ODT) via LibreOffice.'
+  note.textContent = t('pdf_pdf2doc_note')
 
   const row = document.createElement('div')
   row.style.cssText = 'display:flex;gap:8px;align-items:center;'
-  const pickBtn = btn('Choisir un PDF', 'fa-solid fa-file-pdf')
+  const pickBtn = btn(t('pdf_pick_pdf'), 'fa-solid fa-file-pdf')
   const fileLbl = document.createElement('span')
   fileLbl.style.cssText = 'flex:1;font-size:11px;color:var(--text-secondary);'
-  fileLbl.textContent = 'Aucun fichier'
+  fileLbl.textContent = t('pdf_no_file')
   row.append(pickBtn, fileLbl)
 
   let pdfPath = null
@@ -484,9 +490,9 @@ function buildPdfToDoc(wrap) {
     opt.value = val; opt.textContent = label
     fmtSelect.appendChild(opt)
   }
-  fmtRow.append(document.createTextNode('Format : '), fmtSelect)
+  fmtRow.append(document.createTextNode(t('pdf_format') + ' '), fmtSelect)
 
-  const goBtn = btn('Convertir', 'fa-solid fa-file-word', true)
+  const goBtn = btn(t('pdf_convert'), 'fa-solid fa-file-word', true)
   const status = statusDiv()
   wrap.append(note, row, fmtRow, goBtn, status)
 
@@ -496,18 +502,18 @@ function buildPdfToDoc(wrap) {
   })
 
   goBtn.addEventListener('click', async () => {
-    if (!pdfPath) { setStatus(status, 'Choisissez un PDF.', 'error'); return }
+    if (!pdfPath) { setStatus(status, t('pdf_err_pick'), 'error'); return }
     const soffice = await invoke('find_libreoffice', {})
-    if (!soffice) { setStatus(status, 'LibreOffice non trouvé.', 'error'); return }
+    if (!soffice) { setStatus(status, t('pdf_err_lo'), 'error'); return }
     const { dialog } = window.__TAURI__
-    const dir = await dialog.open({ directory: true, title: 'Dossier de destination' }).catch(() => null)
+    const dir = await dialog.open({ directory: true, title: t('pdf_dest_folder') }).catch(() => null)
     if (!dir) return
-    setStatus(status, 'Conversion en cours…')
+    setStatus(status, t('pdf_converting'))
     goBtn.disabled = true
     try {
       const out = await invoke('convert_with_libreoffice', { soffice, input: pdfPath, outputDir: dir, format: fmtSelect.value })
-      setStatus(status, `Converti → ${shortName(out)} ✓`, 'success')
-    } catch (e) { setStatus(status, String(e), 'error') }
+      setStatus(status, t('pdf_converted').replace('{file}', () => shortName(out)) + ' ✓', 'success')
+    } catch (e) { setStatus(status, t('pdf_error') + ' ' + String(e), 'error') }
     goBtn.disabled = false
   })
 }
@@ -522,14 +528,14 @@ export function initPdfTool(body) {
   body.style.cssText = 'display:flex;flex-direction:column;height:100%;background:var(--surface);font-size:12px;'
 
   const TABS = [
-    { id: 'merge',     label: 'Fusionner',     icon: 'fa-solid fa-object-group', build: buildMerge },
-    { id: 'split',     label: 'Diviser',        icon: 'fa-solid fa-scissors',     build: buildSplit },
-    { id: 'rotate',    label: 'Pivoter',        icon: 'fa-solid fa-rotate-right', build: buildRotate },
-    { id: 'reorder',   label: 'Réordonner',     icon: 'fa-solid fa-sort',         build: buildReorder },
-    { id: 'img2pdf',   label: 'Images → PDF',   icon: 'fa-solid fa-images',       build: buildImagesToPdf },
-    { id: 'pdf2img',   label: 'PDF → Images',   icon: 'fa-solid fa-image',        build: buildPdfToImages },
-    { id: 'doc2pdf',   label: 'Doc → PDF',      icon: 'fa-solid fa-file-pdf',     build: buildDocToPdf },
-    { id: 'pdf2doc',   label: 'PDF → Doc',      icon: 'fa-solid fa-file-word',    build: buildPdfToDoc },
+    { id: 'merge',     label: t('pdf_merge'),       icon: 'fa-solid fa-object-group', build: buildMerge },
+    { id: 'split',     label: t('pdf_split'),       icon: 'fa-solid fa-scissors',     build: buildSplit },
+    { id: 'rotate',    label: t('pdf_rotate'),      icon: 'fa-solid fa-rotate-right', build: buildRotate },
+    { id: 'reorder',   label: t('pdf_reorder'),     icon: 'fa-solid fa-sort',         build: buildReorder },
+    { id: 'img2pdf',   label: t('pdf_tab_img2pdf'), icon: 'fa-solid fa-images',       build: buildImagesToPdf },
+    { id: 'pdf2img',   label: t('pdf_tab_pdf2img'), icon: 'fa-solid fa-image',        build: buildPdfToImages },
+    { id: 'doc2pdf',   label: t('pdf_tab_doc2pdf'), icon: 'fa-solid fa-file-pdf',     build: buildDocToPdf },
+    { id: 'pdf2doc',   label: t('pdf_tab_pdf2doc'), icon: 'fa-solid fa-file-word',    build: buildPdfToDoc },
   ]
 
   // Tab bar

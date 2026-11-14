@@ -2,19 +2,47 @@
 
 import { trackRecentFile } from './recent.js'
 import { makeSendButton, imageMedia } from './media-bus.js'
+import { t } from './i18n.js'
+import { ffmpegFontFile, cssFontFor } from './fonts.js'
+import { enhanceSidePanel } from './side-panel.js'
+
+const IMG_EXTS = ['jpg','jpeg','png','webp','gif','bmp']
+const VID_EXTS = ['mp4','mov','mkv','avi','webm','m4v']
+const ENCODABLE = ['png','jpg','jpeg','webp']          // what a canvas can write back
+// drawtext needs a font file: one that can draw the text's script, in bold like the preview
+
+// Extension of a path or file name ('' when there is none).
+const extOf = p => (String(p || '').split(/[\\/]/).pop().match(/\.([^.]+)$/)?.[1] || '').toLowerCase()
+const imgMime = ext => 'image/' + (ext === 'jpg' ? 'jpeg' : ext)
+const samePath = (a, b) => String(a).replace(/\\/g, '/').toLowerCase() === String(b).replace(/\\/g, '/').toLowerCase()
+
+// Resolves with the decoded image, rejects (with nothing) when it can't be decoded.
+const loadImage = src => new Promise((resolve, reject) => {
+  const img = new Image()
+  img.onload = () => resolve(img)
+  img.onerror = () => reject(null)
+  img.src = src
+})
+
+// drawtext text, escaped for ffmpeg's three parsing levels (same as videorec-render.js):
+// drawtext expansion (\ %), option value (\ ' :), filtergraph (\ ' [ ] , ;).
+const escapeDrawtext = s => String(s)
+  .replace(/[\\%]/g, m => '\\' + m)
+  .replace(/[\\':]/g, m => '\\' + m)
+  .replace(/[\\'[\],;]/g, m => '\\' + m)
 
 export function initWatermark(body) {
   body.style.cssText = 'display:flex;flex-direction:column;height:100%;background:var(--surface);font-size:12px;font-family:inherit;'
 
   const POSITIONS = [
-    ['top-left','haut-gauche'], ['top-center','haut-centre'], ['top-right','haut-droite'],
-    ['mid-left','milieu-gauche'], ['center','centre'],       ['mid-right','milieu-droite'],
-    ['bot-left','bas-gauche'],  ['bot-center','bas-centre'],  ['bot-right','bas-droite'],
+    ['top-left',t('wm_pos_top_left')], ['top-center',t('wm_pos_top_center')], ['top-right',t('wm_pos_top_right')],
+    ['mid-left',t('wm_pos_mid_left')], ['center',t('wm_pos_center')],         ['mid-right',t('wm_pos_mid_right')],
+    ['bot-left',t('wm_pos_bot_left')], ['bot-center',t('wm_pos_bot_center')], ['bot-right',t('wm_pos_bot_right')],
   ]
 
   let state = {
     mode:     'text',     // 'text' | 'image'
-    wmText:   'Filigrane',
+    wmText:   t('wm_default_text'),
     wmFont:   '36',
     wmColor:  '#ffffff',
     wmOpacity: 0.5,
@@ -29,6 +57,9 @@ export function initWatermark(body) {
     mediaType: null,  // 'image' | 'video'
     mediaName: '',
   }
+
+  // Backend errors stay as they are, after a translated label.
+  const toastErr = (label, e) => window.toast?.(e ? `${label}: ${e?.message ?? e}` : label, 'error')
 
   // ── Layout ─────────────────────────────────────────────────────────────────
   const main = document.createElement('div')
@@ -48,27 +79,68 @@ export function initWatermark(body) {
 
   rightArea.append(previewBox, bottomBar)
   main.append(leftPanel, rightArea)
+  enhanceSidePanel(leftPanel, { id: 'watermark', side: 'left' })
   body.append(main)
 
   // ── Preview canvas ─────────────────────────────────────────────────────────
   const canvas = document.createElement('canvas')
   canvas.style.cssText = 'max-width:100%;max-height:100%;display:none;'
-  const ctx = canvas.getContext('2d')
 
   const dropHint = document.createElement('div')
   dropHint.style.cssText = 'color:color-mix(in srgb, var(--text-secondary) 65%, transparent);text-align:center;pointer-events:none;'
-  dropHint.innerHTML = '<i class="fa-solid fa-image" style="font-size:40px;display:block;margin-bottom:8px;"></i>Glissez une image ou vidéo ici<br><span style="font-size:10px;color:color-mix(in srgb, var(--text-secondary) 50%, transparent);">PNG · JPG · WEBP · MP4 · MOV · MKV · AVI · WEBM</span>'
+  dropHint.innerHTML = '<i class="fa-solid fa-image" style="font-size:40px;display:block;margin-bottom:8px;"></i>' + t('wm_drop_hint') + '<br><span style="font-size:10px;color:color-mix(in srgb, var(--text-secondary) 50%, transparent);">PNG · JPG · WEBP · MP4 · MOV · MKV · AVI · WEBM</span>'
 
   previewBox.append(dropHint, canvas)
 
   // ── Drop zone ──────────────────────────────────────────────────────────────
+  // Browser drop (web version): the File has no disk path — register it with the
+  // web shim, like the open button's picker does. Elsewhere it can't be read.
   previewBox.addEventListener('dragover', e => { e.preventDefault(); previewBox.style.background = 'color-mix(in srgb, var(--color-active) 12%, var(--preview-bg))' })
   previewBox.addEventListener('dragleave', () => { previewBox.style.background = 'var(--preview-bg)' })
   previewBox.addEventListener('drop', async e => {
     e.preventDefault(); previewBox.style.background = 'var(--preview-bg)'
     const file = e.dataTransfer?.files?.[0]; if (!file) return
-    await loadMedia(file.path || null, file.name)
+    let path = file.path || null
+    if (!path && window.__ICEAMPLE_WEB_REGISTER__) path = window.__ICEAMPLE_WEB_REGISTER__(file)
+    if (!path) { window.toast?.(t('wm_cant_read'), 'error'); return }
+    await loadMedia(path, file.name)
   })
+
+  // Library drag (in-app protocol): the file carries its real path.
+  body.addEventListener('iceample-drop', e => {
+    const file = e.detail?.file
+    if (!file?.path) return
+    loadMedia(file.path, file.name || file.path.split(/[\\/]/).pop())
+  })
+
+  // OS file drop in the desktop app. onDragDropEvent is webview-GLOBAL: act only
+  // while this tool is in the document (and not when the drop lands on another
+  // tool), and unlisten at teardown.
+  let dead = false
+  let dropUnlisten = null
+  if (window.__TAURI__) {
+    ;(async () => {
+      try {
+        const wv = window.__TAURI__.webview?.getCurrentWebview?.()
+        if (!wv?.onDragDropEvent) return
+        dropUnlisten = await wv.onDragDropEvent(e => {
+          if (!document.contains(body)) return
+          const { type, paths, position } = e.payload || {}
+          if (type !== 'drop' || !paths?.length) return
+          const x = Number(position?.x), y = Number(position?.y)
+          if (Number.isFinite(x) && Number.isFinite(y)) {
+            const dpr = window.devicePixelRatio || 1
+            const hit = document.elementFromPoint(x / dpr, y / dpr)
+            if (hit && !(body.closest('.tool-win') || body).contains(hit)) return
+          }
+          const path = paths[0], ext = extOf(path)
+          if (!IMG_EXTS.includes(ext) && !VID_EXTS.includes(ext)) return
+          loadMedia(path, path.split(/[\\/]/).pop())
+        })
+        if (dead) { dropUnlisten?.(); dropUnlisten = null }   // closed while awaiting
+      } catch {}
+    })()
+  }
 
   // ── Panel helpers ──────────────────────────────────────────────────────────
   const SEL = 'background:var(--surface,#111);border:1px solid var(--win-border-in,#1e1e1e);color:var(--text-primary,#ddd);border-radius:5px;padding:4px 7px;font-size:11px;font-family:inherit;width:100%;box-sizing:border-box;'
@@ -94,9 +166,9 @@ export function initWatermark(body) {
   }
 
   // ── Media picker ──────────────────────────────────────────────────────────
-  leftPanel.appendChild(pLabel('Fichier source'))
+  leftPanel.appendChild(pLabel(t('wm_source_file')))
   const pickMediaBtn = document.createElement('button')
-  pickMediaBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i> Ouvrir image/vidéo'
+  pickMediaBtn.innerHTML = '<i class="fa-solid fa-folder-open"></i> ' + t('wm_open_media')
   pickMediaBtn.style.cssText = 'border:1px solid var(--win-border-in,#1e1e1e);border-radius:5px;padding:6px;cursor:pointer;font-size:11px;font-family:inherit;background:var(--surface,#111);color:var(--text-primary);width:100%;'
   leftPanel.appendChild(pickMediaBtn)
 
@@ -108,7 +180,7 @@ export function initWatermark(body) {
     if (!window.__TAURI__) return
     try {
       const result = await window.__TAURI__.core.invoke('pick_files_with_filter', {
-        filterName: 'Images/Vidéos',
+        filterName: t('wm_filter_media'),
         extensions: ['jpg','jpeg','png','webp','gif','mp4','mov','mkv','avi','webm'],
       })
       const item = Array.isArray(result) ? result[0] : result
@@ -120,9 +192,9 @@ export function initWatermark(body) {
   })
 
   // ── Watermark mode ────────────────────────────────────────────────────────
-  leftPanel.appendChild(pLabel('Type de filigrane'))
+  leftPanel.appendChild(pLabel(t('wm_type')))
   const modeRow = document.createElement('div'); modeRow.style.cssText = 'display:flex;gap:6px;'
-  for (const [id, txt] of [['text','Texte'],['image','Image']]) {
+  for (const [id, txt] of [['text',t('wm_text')],['image',t('wm_image')]]) {
     const b = document.createElement('button')
     b.textContent = txt; b.dataset.mode = id
     b.style.cssText = 'flex:1;border-radius:5px;padding:5px;cursor:pointer;font-size:11px;font-family:inherit;border:1px solid var(--win-border-in,#1e1e1e);background:var(--surface,#111);color:var(--text-secondary);'
@@ -133,13 +205,13 @@ export function initWatermark(body) {
 
   // ── Text controls ─────────────────────────────────────────────────────────
   const textGroup = document.createElement('div'); textGroup.style.cssText = 'display:flex;flex-direction:column;gap:6px;'
-  textGroup.appendChild(pLabel('Texte'))
+  textGroup.appendChild(pLabel(t('wm_text')))
   const textInp = document.createElement('input'); textInp.type = 'text'; textInp.value = state.wmText; textInp.style.cssText = INP
   textInp.addEventListener('input', () => { state.wmText = textInp.value; updatePreview() })
   textGroup.appendChild(textInp)
 
   const fontLabel = document.createElement('div'); fontLabel.style.cssText = 'display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary);'
-  const fLbl = document.createElement('span'); fLbl.textContent = 'Taille police'
+  const fLbl = document.createElement('span'); fLbl.textContent = t('wm_font_size')
   const fVal = document.createElement('span'); fVal.style.cssText = 'color:var(--text-primary);font-weight:500;'; fVal.textContent = state.wmFont
   fontLabel.append(fLbl, fVal)
   const fontRange = document.createElement('input'); fontRange.type = 'range'; fontRange.min = 10; fontRange.max = 120; fontRange.step = 2; fontRange.value = state.wmFont
@@ -148,7 +220,7 @@ export function initWatermark(body) {
   textGroup.append(fontLabel, fontRange)
 
   const colorRow2 = document.createElement('div'); colorRow2.style.cssText = 'display:flex;align-items:center;gap:8px;'
-  const cLbl = document.createElement('span'); cLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;'; cLbl.textContent = 'Couleur'
+  const cLbl = document.createElement('span'); cLbl.style.cssText = 'font-size:11px;color:var(--text-secondary);flex:1;'; cLbl.textContent = t('wm_color')
   const colorInp = document.createElement('input'); colorInp.type = 'color'; colorInp.value = state.wmColor
   colorInp.style.cssText = 'width:40px;height:24px;border:1px solid var(--win-border);border-radius:4px;padding:1px;cursor:pointer;background:none;'
   colorInp.addEventListener('input', () => { state.wmColor = colorInp.value; updatePreview() })
@@ -158,27 +230,35 @@ export function initWatermark(body) {
 
   // ── Image watermark ────────────────────────────────────────────────────────
   const imgGroup = document.createElement('div'); imgGroup.style.cssText = 'display:none;flex-direction:column;gap:6px;'
-  imgGroup.appendChild(pLabel('Image du filigrane'))
+  imgGroup.appendChild(pLabel(t('wm_mark_image')))
   const pickWmImgBtn = document.createElement('button')
-  pickWmImgBtn.innerHTML = '<i class="fa-solid fa-image"></i> Choisir image'
+  pickWmImgBtn.innerHTML = '<i class="fa-solid fa-image"></i> ' + t('wm_pick_image')
   pickWmImgBtn.style.cssText = 'border:1px solid var(--win-border-in,#1e1e1e);border-radius:5px;padding:5px;cursor:pointer;font-size:11px;font-family:inherit;background:var(--surface,#111);color:var(--text-primary);width:100%;'
   pickWmImgBtn.addEventListener('click', async () => {
     if (!window.__TAURI__) return
-    const result = await window.__TAURI__.core.invoke('pick_files_with_filter', {
-      filterName: 'Images',
-      extensions: ['png','jpg','jpeg','webp','gif'],
-    })
-    const item = Array.isArray(result) ? result[0] : result
-    if (!item) return
-    state.wmImgPath = typeof item === 'string' ? item : item.path
-    wmImgLabel.textContent = state.wmImgPath.split(/[\\/]/).pop()
+    let path
+    try {
+      const result = await window.__TAURI__.core.invoke('pick_files_with_filter', {
+        filterName: t('wm_filter_images'),
+        extensions: ['png','jpg','jpeg','webp','gif'],
+      })
+      const item = Array.isArray(result) ? result[0] : result
+      if (!item) return
+      path = typeof item === 'string' ? item : item.path
+    } catch (e) { window.toast?.(String(e), 'error'); return }
+    // Decode it now: a bad file is reported here and never kept.
+    const prev = state.wmImgPath
+    state.wmImgPath = path
+    try { await ensureWmImage() }
+    catch (e) { state.wmImgPath = prev; toastErr(t('wm_load_fail'), e); return }
+    wmImgLabel.textContent = path.split(/[\\/]/).pop()
     updatePreview()
   })
   const wmImgLabel = document.createElement('div'); wmImgLabel.style.cssText = 'font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);'
   imgGroup.append(pickWmImgBtn, wmImgLabel)
 
   const iwLabel = document.createElement('div'); iwLabel.style.cssText = 'display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary);'
-  const iwLbl = document.createElement('span'); iwLbl.textContent = 'Largeur (px)'
+  const iwLbl = document.createElement('span'); iwLbl.textContent = t('wm_width_px')
   const iwVal = document.createElement('span'); iwVal.style.cssText = 'color:var(--text-primary);font-weight:500;'; iwVal.textContent = state.wmImgW
   iwLabel.append(iwLbl, iwVal)
   const iwRange = document.createElement('input'); iwRange.type = 'range'; iwRange.min = 20; iwRange.max = 600; iwRange.step = 10; iwRange.value = state.wmImgW
@@ -188,12 +268,12 @@ export function initWatermark(body) {
   leftPanel.appendChild(imgGroup)
 
   // ── Shared controls ────────────────────────────────────────────────────────
-  leftPanel.appendChild(pLabel('Opacité'))
-  rangeCtrl('wmOpacity', 'Opacité', 0.05, 1, 0.05, 2)
+  leftPanel.appendChild(pLabel(t('wm_opacity')))
+  rangeCtrl('wmOpacity', t('wm_opacity'), 0.05, 1, 0.05, 2)
 
-  leftPanel.appendChild(pLabel('Position'))
+  leftPanel.appendChild(pLabel(t('wm_position')))
   const posGrid = document.createElement('div')
-  posGrid.style.cssText = 'display:grid;grid-template-columns:repeat(3,1fr);gap:3px;'
+  posGrid.style.cssText = 'direction:ltr;display:grid;grid-template-columns:repeat(3,1fr);gap:3px;'
   for (const [pos, lbl] of POSITIONS) {
     const b = document.createElement('button')
     b.style.cssText = 'border:1px solid var(--win-border-in,#1e1e1e);border-radius:4px;padding:4px 2px;cursor:pointer;font-size:9px;font-family:inherit;background:var(--surface,#111);color:var(--text-secondary);text-align:center;'
@@ -203,9 +283,9 @@ export function initWatermark(body) {
   }
   leftPanel.appendChild(posGrid)
 
-  leftPanel.appendChild(pLabel('Marge'))
-  rangeCtrl('wmPadX', 'Horizontal', 0, 100, 1)
-  rangeCtrl('wmPadY', 'Vertical',   0, 100, 1)
+  leftPanel.appendChild(pLabel(t('wm_margin')))
+  rangeCtrl('wmPadX', t('wm_horizontal'), 0, 100, 1)
+  rangeCtrl('wmPadY', t('wm_vertical'),   0, 100, 1)
 
   // ── UI state ───────────────────────────────────────────────────────────────
   function updateModeUI() {
@@ -231,59 +311,69 @@ export function initWatermark(body) {
 
   // ── Media load ─────────────────────────────────────────────────────────────
   let baseImageEl = null
+  let loadSeq = 0
+
+  const clearVidInfo = () => { for (const el of previewBox.querySelectorAll('.vid-info')) el.remove() }
+
+  function setMedia(path, name, type) {
+    state.mediaPath = path; state.mediaName = name; state.mediaType = type
+    mediaNameLbl.textContent = name
+  }
+
+  function showImage(img, path, name) {
+    baseImageEl = img
+    setMedia(path, name, 'image')
+    clearVidInfo()
+    dropHint.style.display = 'none'
+    canvas.style.display = 'block'
+    updatePreview()
+  }
 
   async function loadMedia(path, name) {
     if (!path) return
-    const ext = (name || path).split('.').pop().toLowerCase()
-    const isImg = ['jpg','jpeg','png','webp','gif','bmp'].includes(ext)
-    const isVid = ['mp4','mov','mkv','avi','webm','m4v'].includes(ext)
+    const fileName = name || path.split(/[\\/]/).pop()
+    const ext = extOf(fileName)
+    const isImg = IMG_EXTS.includes(ext)
+    const isVid = VID_EXTS.includes(ext)
+    if (!isImg && !isVid) { window.toast?.(t('wm_unsupported'), 'warn'); return }
+    const seq = ++loadSeq
 
-    state.mediaPath = path; state.mediaName = name || path.split(/[\\/]/).pop()
-    state.mediaType = isImg ? 'image' : isVid ? 'video' : null
-    mediaNameLbl.textContent = state.mediaName
-
-    if (isImg && window.__TAURI__) {
+    if (isImg) {
+      if (!window.__TAURI__) return
+      let img
       try {
         const b64 = await window.__TAURI__.core.invoke('read_file_base64', { path })
-        baseImageEl = new Image()
-        baseImageEl.src = `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${b64}`
-        baseImageEl.onload = () => {
-          dropHint.style.display = 'none'
-          canvas.style.display = 'block'
-          updatePreview()
-        }
-      } catch (e) { window.toast?.(String(e), 'error') }
-    } else if (isVid) {
+        img = await loadImage(`data:${imgMime(ext)};base64,${b64}`)
+      } catch (e) { if (seq === loadSeq) toastErr(t('wm_load_fail'), e); return }
+      if (seq !== loadSeq) return          // a newer file was opened meanwhile
+      showImage(img, path, fileName)
+    } else {
       baseImageEl = null
+      setMedia(path, fileName, 'video')
+      clearVidInfo()
       dropHint.style.display = 'none'
       canvas.style.display = 'none'
       const vidInfo = document.createElement('div')
-      vidInfo.style.cssText = 'color:var(--text-secondary);font-size:11px;text-align:center;padding:12px;'
-      vidInfo.innerHTML = `<i class="fa-solid fa-film" style="font-size:32px;display:block;margin-bottom:8px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);"></i>${state.mediaName}<br><span style="font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);">Aperçu non disponible pour les vidéos.<br>Cliquez sur Appliquer pour traiter.</span>`
-      // clear old vid info
-      for (const el of previewBox.querySelectorAll('.vid-info')) el.remove()
       vidInfo.className = 'vid-info'
+      vidInfo.style.cssText = 'color:var(--text-secondary);font-size:11px;text-align:center;padding:12px;'
+      vidInfo.innerHTML = `<i class="fa-solid fa-film" style="font-size:32px;display:block;margin-bottom:8px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);"></i><span class="vid-name"></span><br><span style="font-size:10px;color:color-mix(in srgb, var(--text-secondary) 65%, transparent);">${t('wm_video_no_preview')}<br>${t('wm_video_click_apply')}</span>`
+      vidInfo.querySelector('.vid-name').textContent = fileName
       previewBox.appendChild(vidInfo)
     }
   }
 
   // Media bus: an image sent from another tool becomes the base media (no file
   // on disk — applyImage draws from baseImageEl, so save works too).
-  body.addEventListener('iceample-media', e => {
+  body.addEventListener('iceample-media', async e => {
     const m = e.detail
     if (!m || m.kind !== 'image' || !m.dataUrl) return
-    baseImageEl = new Image()
-    baseImageEl.onload = () => {
-      state.mediaPath = 'bus:' + (m.name || 'image')
-      state.mediaType = 'image'
-      state.mediaName = (m.name || 'image').replace(/\.[a-z0-9]+$/i, '') + '.png'
-      mediaNameLbl.textContent = state.mediaName
-      for (const el of previewBox.querySelectorAll('.vid-info')) el.remove()
-      dropHint.style.display = 'none'
-      canvas.style.display = 'block'
-      updatePreview()
-    }
-    baseImageEl.src = m.dataUrl
+    const seq = ++loadSeq
+    let img
+    try { img = await loadImage(m.dataUrl) }
+    catch (err) { if (seq === loadSeq) toastErr(t('wm_load_fail'), err); return }
+    if (seq !== loadSeq) return
+    const name = (m.name || 'image').replace(/\.[a-z0-9]+$/i, '') + '.png'
+    showImage(img, 'bus:' + (m.name || 'image'), name)
   })
 
   // ── Watermark position calc ────────────────────────────────────────────────
@@ -303,48 +393,55 @@ export function initWatermark(body) {
     return posMap[state.wmPos] || posMap['bot-right']
   }
 
-  // ── Preview update ─────────────────────────────────────────────────────────
+  // ── Watermark image ────────────────────────────────────────────────────────
   let wmImageEl = null
 
+  // Decoded watermark image (cached per path). Throws if it can't be read/decoded.
   async function ensureWmImage() {
     if (!state.wmImgPath || !window.__TAURI__) return null
     if (wmImageEl && wmImageEl._src === state.wmImgPath) return wmImageEl
-    const ext = state.wmImgPath.split('.').pop().toLowerCase()
-    const b64 = await window.__TAURI__.core.invoke('read_file_base64', { path: state.wmImgPath })
-    wmImageEl = new Image()
-    wmImageEl.src = `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${b64}`
-    wmImageEl._src = state.wmImgPath
-    await new Promise(r => { wmImageEl.onload = r })
-    return wmImageEl
+    const path = state.wmImgPath
+    const b64 = await window.__TAURI__.core.invoke('read_file_base64', { path })
+    const img = await loadImage(`data:${imgMime(extOf(path))};base64,${b64}`)
+    img._src = path
+    wmImageEl = img
+    return img
   }
 
-  async function updatePreview() {
-    if (!baseImageEl || state.mediaType !== 'image') return
+  // Base image + watermark at full resolution. Synchronous: the watermark image is
+  // resolved beforehand, so overlapping previews can't interleave their drawing.
+  function renderInto(cv, wmImg) {
     const W = baseImageEl.naturalWidth; const H = baseImageEl.naturalHeight
-    canvas.width = W; canvas.height = H
-    ctx.drawImage(baseImageEl, 0, 0, W, H)
-
-    ctx.globalAlpha = state.wmOpacity
+    cv.width = W; cv.height = H
+    const c = cv.getContext('2d')
+    c.drawImage(baseImageEl, 0, 0, W, H)
+    c.globalAlpha = state.wmOpacity
 
     if (state.mode === 'text') {
       const fs = parseInt(state.wmFont)
-      ctx.font = `bold ${fs}px sans-serif`
-      ctx.fillStyle = state.wmColor
-      const metrics = ctx.measureText(state.wmText)
+      c.font = `bold ${fs}px ${cssFontFor(state.wmText)}`
+      c.fillStyle = state.wmColor
+      const metrics = c.measureText(state.wmText)
       const wmW = metrics.width; const wmH = fs
       const { x, y } = getWmPos(W, H, wmW, wmH)
-      ctx.fillText(state.wmText, x, y + wmH)
-    } else if (state.mode === 'image') {
-      const imgEl = await ensureWmImage()
-      if (imgEl) {
-        const scale = state.wmImgW / imgEl.naturalWidth
-        const wmW = state.wmImgW; const wmH = imgEl.naturalHeight * scale
-        const { x, y } = getWmPos(W, H, wmW, wmH)
-        ctx.drawImage(imgEl, x, y, wmW, wmH)
-      }
+      c.fillText(state.wmText, x, y + wmH)
+    } else if (state.mode === 'image' && wmImg) {
+      const scale = state.wmImgW / wmImg.naturalWidth
+      const wmW = state.wmImgW; const wmH = wmImg.naturalHeight * scale
+      const { x, y } = getWmPos(W, H, wmW, wmH)
+      c.drawImage(wmImg, x, y, wmW, wmH)
     }
 
-    ctx.globalAlpha = 1
+    c.globalAlpha = 1
+  }
+
+  // ── Preview update ─────────────────────────────────────────────────────────
+  async function updatePreview() {
+    if (!baseImageEl || state.mediaType !== 'image') return
+    let wmImg = null
+    if (state.mode === 'image') { try { wmImg = await ensureWmImage() } catch { wmImg = null } }
+    if (!baseImageEl || state.mediaType !== 'image') return
+    renderInto(canvas, wmImg)
   }
 
   // ── Bottom bar: apply & export ─────────────────────────────────────────────
@@ -355,7 +452,7 @@ export function initWatermark(body) {
     return b
   }
 
-  const applyBtn   = BTN2('Appliquer et sauvegarder', 'fa-wand-magic-sparkles', 'var(--btn-primary)')
+  const applyBtn   = BTN2(t('wm_apply_save'), 'fa-wand-magic-sparkles', 'var(--btn-primary)')
   const statusLbl  = document.createElement('span')
   statusLbl.style.cssText = 'font-size:10px;color:var(--text-secondary);margin-left:auto;'
   // "Send to…" — ship the watermarked result (preview canvas is full-res).
@@ -368,95 +465,86 @@ export function initWatermark(body) {
   bottomBar.append(applyBtn, sendBtn, statusLbl)
 
   applyBtn.addEventListener('click', async () => {
-    if (!state.mediaPath) { window.toast?.('Ouvrez d\'abord un fichier', 'warn'); return }
+    if (!state.mediaPath) { window.toast?.(t('wm_open_first'), 'warn'); return }
     if (state.mediaType === 'image') await applyImage()
     else if (state.mediaType === 'video') await applyVideo()
   })
 
   async function applyImage() {
-    if (!window.__TAURI__) return
-    const ext = state.mediaName.split('.').pop().toLowerCase()
-    const defaultName = state.mediaName.replace(/\.[^.]+$/, `_wm.${ext}`)
-    const path = await window.__TAURI__.dialog.save({
-      defaultPath: defaultName,
-      filters: [{ name: 'Image', extensions: [ext, 'png', 'jpg'] }],
-    })
-    if (!path) return
-
-    // Draw full-res to offscreen canvas
-    const W = baseImageEl.naturalWidth; const H = baseImageEl.naturalHeight
-    const off = document.createElement('canvas'); off.width = W; off.height = H
-    const oc = off.getContext('2d')
-    oc.drawImage(baseImageEl, 0, 0, W, H)
-    oc.globalAlpha = state.wmOpacity
-
-    if (state.mode === 'text') {
-      const fs = parseInt(state.wmFont)
-      oc.font = `bold ${fs}px sans-serif`
-      oc.fillStyle = state.wmColor
-      const metrics = oc.measureText(state.wmText)
-      const wmW = metrics.width; const wmH = fs
-      const { x, y } = getWmPos(W, H, wmW, wmH)
-      oc.fillText(state.wmText, x, y + wmH)
-    } else if (state.mode === 'image') {
-      const imgEl = await ensureWmImage()
-      if (imgEl) {
-        const scale = state.wmImgW / imgEl.naturalWidth
-        const wmW = state.wmImgW; const wmH = imgEl.naturalHeight * scale
-        const { x, y } = getWmPos(W, H, wmW, wmH)
-        oc.drawImage(imgEl, x, y, wmW, wmH)
-      }
-    }
-    oc.globalAlpha = 1
-
-    const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 'image/png'
-    const b64 = off.toDataURL(mimeType).split(',')[1]
+    if (!window.__TAURI__ || !baseImageEl) return
+    // Offer only formats a canvas can encode (a GIF/BMP source defaults to PNG).
+    const srcExt = extOf(state.mediaName)
+    const ext = ENCODABLE.includes(srcExt) ? srcExt : 'png'
+    const defaultName = state.mediaName.replace(/\.[^.]+$/, '') + `_wm.${ext}`
     try {
+      const path = await window.__TAURI__.dialog.save({
+        defaultPath: defaultName,
+        filters: [{ name: t('wm_image'), extensions: [...new Set([ext, 'png', 'jpg'])] }],
+      })
+      if (!path) return
+
+      let wmImg = null
+      if (state.mode === 'image' && state.wmImgPath) {
+        try { wmImg = await ensureWmImage() }
+        catch (e) { toastErr(t('wm_load_fail'), e); return }
+      }
+      const off = document.createElement('canvas')
+      renderInto(off, wmImg)
+
+      // Encoding follows the file name the user chose, not the source file.
+      const outExt = extOf(path)
+      const mimeType = outExt === 'jpg' || outExt === 'jpeg' ? 'image/jpeg' : outExt === 'webp' ? 'image/webp' : 'image/png'
+      const b64 = off.toDataURL(mimeType).split(',')[1]
       await window.__TAURI__.core.invoke('save_binary_file', { path, base64: b64 })
       trackRecentFile(path, defaultName)
-      window.toast?.('Image sauvegardée ✓', 'success')
+      window.toast?.(t('wm_image_saved') + ' ✓', 'success')
       statusLbl.textContent = '✓ ' + path.split(/[\\/]/).pop()
     } catch (e) { window.toast?.(String(e), 'error') }
   }
 
   async function applyVideo() {
     if (!window.__TAURI__) return
-    const ext = state.mediaName.split('.').pop().toLowerCase()
-    const defaultName = state.mediaName.replace(/\.[^.]+$/, `_wm.${ext}`)
-    const path = await window.__TAURI__.dialog.save({
-      defaultPath: defaultName,
-      filters: [{ name: 'Vidéo', extensions: [ext] }],
-    })
+    if (state.mode === 'text' && !state.wmText.trim()) { window.toast?.(t('wm_enter_text'), 'warn'); return }
+    if (state.mode === 'image' && !state.wmImgPath) { window.toast?.(t('wm_select_mark_image'), 'warn'); return }
+    const ext = extOf(state.mediaName)
+    const defaultName = state.mediaName.replace(/\.[^.]+$/, '') + `_wm.${ext}`
+    let path
+    try {
+      path = await window.__TAURI__.dialog.save({
+        defaultPath: defaultName,
+        filters: [{ name: t('wm_video'), extensions: [ext] }],
+      })
+    } catch (e) { window.toast?.(String(e), 'error'); return }
     if (!path) return
+    // ffmpeg runs with -y (the save dialog already asked about overwriting), so it
+    // must never write over the file it is reading.
+    if (samePath(path, state.mediaPath)) { window.toast?.(t('wm_same_file'), 'warn'); return }
 
-    statusLbl.textContent = 'Traitement…'; applyBtn.disabled = true
+    statusLbl.textContent = t('wm_processing'); applyBtn.disabled = true
 
     try {
       if (state.mode === 'text') {
         // FFmpeg drawtext filter
         const posArgs = ffmpegTextPos()
-        const escaped = state.wmText.replace(/'/g, "\\'").replace(/:/g, '\\:')
         const color = state.wmColor.replace('#', '0x') + Math.round(state.wmOpacity * 255).toString(16).padStart(2, '0')
-        const filterStr = `drawtext=text='${escaped}':fontsize=${state.wmFont}:fontcolor=${color}:${posArgs}`
+        const filterStr = `drawtext=fontfile='${ffmpegFontFile(state.wmText, { bold: true })}':text=${escapeDrawtext(state.wmText)}:fontsize=${state.wmFont}:fontcolor=${color}:${posArgs}`
         await window.__TAURI__.core.invoke('ffmpeg_run', {
-          args: ['-i', state.mediaPath, '-vf', filterStr, '-c:a', 'copy', path]
+          args: ['-y', '-i', state.mediaPath, '-vf', filterStr, '-c:a', 'copy', path]
         })
-      } else if (state.mode === 'image' && state.wmImgPath) {
+      } else {
         // FFmpeg overlay filter
         const overlayExpr = ffmpegOverlayPos()
         const alphaFilter = `[1:v]scale=${state.wmImgW}:-1,format=rgba,colorchannelmixer=aa=${state.wmOpacity}[wm];[0:v][wm]overlay=${overlayExpr}[out]`
         await window.__TAURI__.core.invoke('ffmpeg_run', {
-          args: ['-i', state.mediaPath, '-i', state.wmImgPath, '-filter_complex', alphaFilter, '-map', '[out]', '-map', '0:a?', '-c:a', 'copy', path]
+          args: ['-y', '-i', state.mediaPath, '-i', state.wmImgPath, '-filter_complex', alphaFilter, '-map', '[out]', '-map', '0:a?', '-c:a', 'copy', path]
         })
-      } else {
-        window.toast?.('Sélectionnez une image de filigrane', 'warn'); applyBtn.disabled = false; statusLbl.textContent = ''; return
       }
       trackRecentFile(path, defaultName)
-      window.toast?.('Vidéo traitée ✓', 'success')
+      window.toast?.(t('wm_video_done') + ' ✓', 'success')
       statusLbl.textContent = '✓ ' + path.split(/[\\/]/).pop()
     } catch (e) {
       window.toast?.(String(e), 'error')
-      statusLbl.textContent = 'Erreur'
+      statusLbl.textContent = t('wm_error')
     } finally { applyBtn.disabled = false }
   }
 
@@ -479,7 +567,6 @@ export function initWatermark(body) {
 
   function ffmpegOverlayPos() {
     const px = state.wmPadX; const py = state.wmPadY
-    const W = state.wmImgW
     const map = {
       'top-left':   `${px}:${py}`,
       'top-center': `(W-overlay_w)/2:${py}`,
@@ -493,4 +580,13 @@ export function initWatermark(body) {
     }
     return map[state.wmPos] || map['bot-right']
   }
+
+  // ── Teardown ──────────────────────────────────────────────────────────────
+  const cleanObs = new MutationObserver(() => {
+    if (document.contains(body)) return
+    dead = true
+    dropUnlisten?.(); dropUnlisten = null
+    cleanObs.disconnect()
+  })
+  cleanObs.observe(document.body, { childList: true, subtree: true })
 }

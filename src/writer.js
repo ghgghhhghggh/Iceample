@@ -1,7 +1,50 @@
 // writer.js — Mini word processor (WYSIWYG / contenteditable)
 import { registerTool } from './project.js'
+import { t } from './i18n.js'
 
 const LS_KEY = 'iceample:writer:content'
+
+// "12 words · 80 characters" — singular only for exactly 1 (as before)
+function countText(words, chars) {
+  const w = (words === 1 ? t('wr_words_one') : t('wr_words_many')).replace('{n}', words)
+  const c = (chars === 1 ? t('wr_chars_one') : t('wr_chars_many')).replace('{n}', chars)
+  return `${w} · ${c}`
+}
+
+// ── HTML sanitizer ────────────────────────────────────────────────────────────
+// Everything that ends up in the page through innerHTML/insertHTML (paste,
+// localStorage, project files) goes through here. Parsed in a detached
+// <template> (inert: no script runs, nothing loads), then walked:
+//  - dangerous elements removed with their content
+//  - every on* attribute removed
+//  - href/src/xlink:href/action/formaction with a javascript:/vbscript: URL removed
+// stripStyles (paste only): also drops style/class, as the old paste filter did.
+const WR_DROP_TAGS = new Set(['script', 'style', 'iframe', 'object', 'embed', 'link', 'meta',
+  'template', 'base', 'frame', 'frameset', 'applet', 'set', 'animate'])
+const WR_URL_ATTRS = new Set(['href', 'src', 'xlink:href', 'action', 'formaction'])
+
+function isScriptUrl(value) {
+  // Browsers ignore whitespace/control chars inside the scheme ("java\tscript:")
+  const v = String(value || '').replace(/[\x00-\x20\x7f]/g, '').toLowerCase()
+  return v.startsWith('javascript:') || v.startsWith('vbscript:')
+}
+
+function sanitizeHtml(html, { stripStyles = false } = {}) {
+  const tpl = document.createElement('template')
+  tpl.innerHTML = String(html ?? '')
+  for (const el of [...tpl.content.querySelectorAll('*')]) {
+    if (WR_DROP_TAGS.has(el.localName.toLowerCase())) { el.remove(); continue }
+    for (const attr of [...el.attributes]) {
+      const name = attr.name.toLowerCase()
+      if (name.startsWith('on') ||
+          (stripStyles && (name === 'style' || name === 'class')) ||
+          (WR_URL_ATTRS.has(name) && isScriptUrl(attr.value))) {
+        el.removeAttribute(attr.name)
+      }
+    }
+  }
+  return tpl.innerHTML
+}
 
 function injectStyles() {
   if (document.getElementById('writer-styles')) return
@@ -43,20 +86,20 @@ export function initWriter(body) {
   body.innerHTML = `
 <div class="wr-body">
   <div class="wr-toolbar" id="wr-tb">
-    <select class="wr-sel" id="wr-block" title="Style de paragraphe">
-      <option value="p">Paragraphe</option>
-      <option value="h1">Titre 1</option>
-      <option value="h2">Titre 2</option>
-      <option value="h3">Titre 3</option>
-      <option value="blockquote">Citation</option>
-      <option value="pre">Code</option>
+    <select class="wr-sel" id="wr-block" title="${t('wr_block_style')}">
+      <option value="p">${t('wr_paragraph')}</option>
+      <option value="h1">${t('wr_heading_n').replace('{n}', '1')}</option>
+      <option value="h2">${t('wr_heading_n').replace('{n}', '2')}</option>
+      <option value="h3">${t('wr_heading_n').replace('{n}', '3')}</option>
+      <option value="blockquote">${t('wr_quote')}</option>
+      <option value="pre">${t('wr_code')}</option>
     </select>
-    <select class="wr-sel" id="wr-font" title="Police">
-      <option value="'Segoe UI',system-ui,sans-serif">Sans-serif</option>
-      <option value="Georgia,'Times New Roman',serif">Serif</option>
-      <option value="Consolas,'Courier New',monospace">Monospace</option>
+    <select class="wr-sel" id="wr-font" title="${t('wr_font')}">
+      <option value="'Segoe UI',system-ui,sans-serif">${t('wr_font_sans')}</option>
+      <option value="Georgia,'Times New Roman',serif">${t('wr_font_serif')}</option>
+      <option value="Consolas,'Courier New',monospace">${t('wr_font_mono')}</option>
     </select>
-    <select class="wr-sel" id="wr-size" title="Taille">
+    <select class="wr-sel" id="wr-size" title="${t('wr_size')}">
       <option value="1">8pt</option>
       <option value="2">10pt</option>
       <option value="3" selected>12pt</option>
@@ -66,32 +109,32 @@ export function initWriter(body) {
       <option value="7">36pt</option>
     </select>
     <div class="wr-sep"></div>
-    <button class="wr-btn" data-cmd="bold"          title="Gras (Ctrl+B)"><i class="fa-solid fa-bold"></i></button>
-    <button class="wr-btn" data-cmd="italic"        title="Italique (Ctrl+I)"><i class="fa-solid fa-italic"></i></button>
-    <button class="wr-btn" data-cmd="underline"     title="Souligné (Ctrl+U)"><i class="fa-solid fa-underline"></i></button>
-    <button class="wr-btn" data-cmd="strikeThrough" title="Barré"><i class="fa-solid fa-strikethrough"></i></button>
-    <button class="wr-btn" id="wr-color-btn"        title="Couleur du texte"><i class="fa-solid fa-palette"></i><input type="color" id="wr-color" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none"></button>
+    <button class="wr-btn" data-cmd="bold"          title="${t('wr_bold')} (Ctrl+B)"><i class="fa-solid fa-bold"></i></button>
+    <button class="wr-btn" data-cmd="italic"        title="${t('wr_italic')} (Ctrl+I)"><i class="fa-solid fa-italic"></i></button>
+    <button class="wr-btn" data-cmd="underline"     title="${t('wr_underline')} (Ctrl+U)"><i class="fa-solid fa-underline"></i></button>
+    <button class="wr-btn" data-cmd="strikeThrough" title="${t('wr_strike')}"><i class="fa-solid fa-strikethrough"></i></button>
+    <button class="wr-btn" id="wr-color-btn"        title="${t('wr_text_color')}"><i class="fa-solid fa-palette"></i><input type="color" id="wr-color" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none"></button>
     <div class="wr-sep"></div>
-    <button class="wr-btn" data-cmd="justifyLeft"   title="Aligner à gauche"><i class="fa-solid fa-align-left"></i></button>
-    <button class="wr-btn" data-cmd="justifyCenter" title="Centrer"><i class="fa-solid fa-align-center"></i></button>
-    <button class="wr-btn" data-cmd="justifyRight"  title="Aligner à droite"><i class="fa-solid fa-align-right"></i></button>
-    <button class="wr-btn" data-cmd="justifyFull"   title="Justifier"><i class="fa-solid fa-align-justify"></i></button>
+    <button class="wr-btn" data-cmd="justifyLeft"   title="${t('wr_align_left')}"><i class="fa-solid fa-align-left"></i></button>
+    <button class="wr-btn" data-cmd="justifyCenter" title="${t('wr_align_center')}"><i class="fa-solid fa-align-center"></i></button>
+    <button class="wr-btn" data-cmd="justifyRight"  title="${t('wr_align_right')}"><i class="fa-solid fa-align-right"></i></button>
+    <button class="wr-btn" data-cmd="justifyFull"   title="${t('wr_justify')}"><i class="fa-solid fa-align-justify"></i></button>
     <div class="wr-sep"></div>
-    <button class="wr-btn" data-cmd="insertUnorderedList" title="Liste à puces"><i class="fa-solid fa-list-ul"></i></button>
-    <button class="wr-btn" data-cmd="insertOrderedList"   title="Liste numérotée"><i class="fa-solid fa-list-ol"></i></button>
-    <button class="wr-btn" data-cmd="outdent" title="Désindenter"><i class="fa-solid fa-outdent"></i></button>
-    <button class="wr-btn" data-cmd="indent"  title="Indenter"><i class="fa-solid fa-indent"></i></button>
+    <button class="wr-btn" data-cmd="insertUnorderedList" title="${t('wr_bullets')}"><i class="fa-solid fa-list-ul"></i></button>
+    <button class="wr-btn" data-cmd="insertOrderedList"   title="${t('wr_numbered')}"><i class="fa-solid fa-list-ol"></i></button>
+    <button class="wr-btn" data-cmd="outdent" title="${t('wr_outdent')}"><i class="fa-solid fa-outdent"></i></button>
+    <button class="wr-btn" data-cmd="indent"  title="${t('wr_indent')}"><i class="fa-solid fa-indent"></i></button>
     <div class="wr-sep"></div>
-    <button class="wr-btn" id="wr-link"                    title="Insérer un lien"><i class="fa-solid fa-link"></i></button>
-    <button class="wr-btn" data-cmd="insertHorizontalRule" title="Ligne de séparation"><i class="fa-solid fa-minus"></i></button>
-    <button class="wr-btn" data-cmd="removeFormat"         title="Effacer la mise en forme"><i class="fa-solid fa-text-slash"></i></button>
+    <button class="wr-btn" id="wr-link"                    title="${t('wr_insert_link')}"><i class="fa-solid fa-link"></i></button>
+    <button class="wr-btn" data-cmd="insertHorizontalRule" title="${t('wr_hr')}"><i class="fa-solid fa-minus"></i></button>
+    <button class="wr-btn" data-cmd="removeFormat"         title="${t('wr_clear_format')}"><i class="fa-solid fa-text-slash"></i></button>
     <div class="wr-spacer"></div>
-    <button class="wr-btn" id="wr-export" title="Exporter (Ctrl+S)"><i class="fa-solid fa-file-export"></i></button>
+    <button class="wr-btn" id="wr-export" title="${t('wr_export')} (Ctrl+S)"><i class="fa-solid fa-file-export"></i></button>
   </div>
   <div class="wr-page-wrap">
-    <div class="wr-page" id="wr-page" contenteditable="true" data-ph="Commencez à écrire…" spellcheck="true"></div>
+    <div class="wr-page" id="wr-page" contenteditable="true" data-ph="${t('wr_placeholder')}" spellcheck="true"></div>
   </div>
-  <div class="wr-foot"><span id="wr-count">0 mot · 0 caractère</span><span id="wr-saved" style="margin-left:auto;opacity:0;transition:opacity .5s"></span></div>
+  <div class="wr-foot"><span id="wr-count">${countText(0, 0)}</span><span id="wr-saved" style="margin-left:auto;opacity:0;transition:opacity .5s"></span></div>
 </div>
   `
 
@@ -106,7 +149,7 @@ export function initWriter(body) {
   // ── Restore ─────────────────────────────────────────────────────────────────
   try {
     const saved = localStorage.getItem(LS_KEY)
-    if (saved) page.innerHTML = saved
+    if (saved) page.innerHTML = sanitizeHtml(saved)
   } catch {}
 
   // ── Save & count ────────────────────────────────────────────────────────────
@@ -114,11 +157,11 @@ export function initWriter(body) {
   function onChange() {
     const text = page.innerText || ''
     const words = text.trim() ? text.trim().split(/\s+/).length : 0
-    countEl.textContent = `${words} mot${words !== 1 ? 's' : ''} · ${text.length} caractère${text.length !== 1 ? 's' : ''}`
+    countEl.textContent = countText(words, text.length)
     clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
       try { localStorage.setItem(LS_KEY, page.innerHTML) } catch {}
-      savedEl.textContent = 'Sauvegardé'; savedEl.style.opacity = '1'
+      savedEl.textContent = t('wr_saved'); savedEl.style.opacity = '1'
       clearTimeout(savedFadeTimer)
       savedFadeTimer = setTimeout(() => { savedEl.style.opacity = '0' }, 1800)
     }, 500)
@@ -135,9 +178,10 @@ export function initWriter(body) {
       blockSel.value = ['h1','h2','h3','blockquote','pre'].includes(blk) ? blk : 'p'
     } catch {}
   }
-  document.addEventListener('selectionchange', () => {
+  const onSelChange = () => {
     if (document.activeElement === page) syncToolbar()
-  })
+  }
+  document.addEventListener('selectionchange', onSelChange)
 
   // ── Toolbar buttons ──────────────────────────────────────────────────────────
   body.querySelectorAll('.wr-btn[data-cmd]').forEach(btn => {
@@ -175,7 +219,7 @@ export function initWriter(body) {
   // Link
   body.querySelector('#wr-link').addEventListener('mousedown', e => {
     e.preventDefault()
-    const url = prompt('URL du lien :')
+    const url = prompt(t('wr_link_url'))
     if (url) { document.execCommand('createLink', false, url); onChange() }
   })
 
@@ -185,11 +229,7 @@ export function initWriter(body) {
     const html = e.clipboardData.getData('text/html')
     const text = e.clipboardData.getData('text/plain')
     if (html) {
-      const clean = html
-        .replace(/\s+style="[^"]*"/gi, '')
-        .replace(/\s+class="[^"]*"/gi, '')
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      document.execCommand('insertHTML', false, clean)
+      document.execCommand('insertHTML', false, sanitizeHtml(html, { stripStyles: true }))
     } else {
       document.execCommand('insertText', false, text)
     }
@@ -221,15 +261,15 @@ export function initWriter(body) {
         defaultPath: 'document.html',
         filters: [
           { name: 'HTML', extensions: ['html'] },
-          { name: 'Texte brut', extensions: ['txt'] }
+          { name: t('wr_plain_text'), extensions: ['txt'] }
         ]
       })
       if (!path) return
       const content = path.toLowerCase().endsWith('.txt') ? (page.innerText || '') : fullHtml
       await window.__TAURI__.core.invoke('save_text_file', { path, content })
       window.dispatchEvent(new CustomEvent('iceample-library-changed', { detail: { folder: path.replace(/[\\/][^\\/]*$/, '') } }))
-      window.toast?.('Exporté', 'success')
-    } catch (err) { window.toast?.(String(err?.message ?? err), 'error') }
+      window.toast?.(t('wr_exported'), 'success')
+    } catch (err) { window.toast?.(t('wr_export_error') + ' ' + String(err?.message ?? err), 'error') }
   }
 
   body.querySelector('#wr-export').addEventListener('mousedown', e => { e.preventDefault(); doExport() })
@@ -277,7 +317,7 @@ export function initWriter(body) {
   registerTool('writer', {
     el: body,
     getState: () => ({ html: page.innerHTML }),
-    setState: s => { if (s?.html != null) { page.innerHTML = s.html; onChange() } }
+    setState: s => { if (s?.html != null) { page.innerHTML = sanitizeHtml(s.html); onChange() } }
   })
 
   onChange()
@@ -286,6 +326,7 @@ export function initWriter(body) {
   new MutationObserver((_, obs) => {
     if (!document.contains(body)) {
       clearTimeout(saveTimer); clearTimeout(savedFadeTimer)
+      document.removeEventListener('selectionchange', onSelChange)
       obs.disconnect()
     }
   }).observe(document.body, { childList: true, subtree: true })

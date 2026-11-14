@@ -10,6 +10,8 @@ import { showPalPicker } from './palettes.js'
 import { makeSendButton, imageMedia } from './media-bus.js'
 import { registerTool, toDataURLAsync } from './project.js'
 import { themeColor } from './theme.js'
+import { enhanceSidePanel } from './side-panel.js'
+import { FX, BUILTIN, runPipeline, defaultParams, resolveFX, fxName, pmLabel, fxGroups, reduceForPreview } from './fx-engine.js'
 
 function injectStyles() {
   if (document.getElementById('ie-styles')) return
@@ -43,8 +45,14 @@ function injectStyles() {
 .ie-empty .ie-btn { pointer-events:auto; }
 .ie-panel { width:23%; min-width:192px; max-width:310px; flex-shrink:0; display:flex; flex-direction:column; overflow-y:auto; overflow-x:hidden;
   background:var(--surface2); border-left:1px solid var(--win-border-in,#1e1e1e); padding:12px 12px 16px; box-shadow:inset 8px 0 16px -16px #000; }
-.ie-tools { display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
-.ie-tbtn { width:100%; height:32px; display:flex; align-items:center; gap:9px; padding:0 11px; border:1px solid var(--win-border,#2a2a2a); background:color-mix(in srgb,var(--text-primary) 7%,var(--surface)); color:var(--text-secondary,#aaa); border-radius:7px; cursor:pointer; font-size:12px; font-family:inherit; transition:background .12s ease,color .12s ease,border-color .12s ease,transform .08s ease; }
+.ie-tools { display:grid; grid-template-columns:repeat(auto-fill, minmax(34px, 1fr)); gap:5px; margin-bottom:8px; }
+.ie-tools .ie-brush-ctl { grid-column:1 / -1; margin-top:2px; }
+/* Tool options: label + value on one line, the slider full width below it
+   (the panel can be narrow: side by side, the slider shrank to a stub). */
+.ie-brush-ctl .ie-field { flex-wrap:wrap; row-gap:3px; }
+.ie-brush-ctl .ie-field > label { width:auto; flex:1; }
+.ie-brush-ctl .ie-field input[type=range] { order:3; flex:1 1 100%; }
+.ie-tbtn { width:100%; height:34px; display:flex; align-items:center; justify-content:center; gap:9px; padding:0; border:1px solid var(--win-border,#2a2a2a); background:color-mix(in srgb,var(--text-primary) 7%,var(--surface)); color:var(--text-secondary,#aaa); border-radius:7px; cursor:pointer; font-size:12px; font-family:inherit; transition:background .12s ease,color .12s ease,border-color .12s ease,transform .08s ease; }
 .ie-tbtn i { width:15px; text-align:center; font-size:13px; }
 .ie-tbtn:hover { background:color-mix(in srgb,var(--text-primary) 13%,var(--surface)); color:var(--text-primary,#fff); }
 .ie-tbtn:active { transform:scale(.98); }
@@ -81,6 +89,22 @@ function injectStyles() {
 .ie-lib-item img { width:100%; height:70px; object-fit:cover; display:block; }
 .ie-lib-item span { display:block; font-size:9px; color:var(--text-secondary); padding:3px 4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ie-drop-ov { position:absolute; inset:3px; z-index:30; display:flex; align-items:center; justify-content:center; background:color-mix(in srgb, var(--color-active,#4a9eff) 10%, transparent); border:2px dashed var(--color-active,#4a9eff); border-radius:6px; pointer-events:none; color:var(--color-active,#4a9eff); font-size:32px; }
+.ie-layer.dragging { opacity:.45; }
+.ie-layer.drop-above { box-shadow:inset 0 2px 0 var(--color-active); }
+.ie-layer.drop-below { box-shadow:inset 0 -2px 0 var(--color-active); }
+.ie-pop { position:fixed; z-index:9999; background:var(--surface); border:1px solid var(--win-border); border-radius:9px; box-shadow:0 12px 32px rgba(0,0,0,.55); min-width:180px; max-height:min(64vh,420px); overflow-y:auto; padding:4px 0; }
+.ie-pop-item { display:flex; align-items:center; gap:8px; padding:6px 13px; cursor:pointer; font-size:11px; color:var(--text-primary); white-space:nowrap; }
+.ie-pop-item i { width:13px; text-align:center; opacity:.7; }
+.ie-pop-item:hover { background:color-mix(in srgb,var(--text-primary) 10%,transparent); }
+.ie-pop-head { padding:6px 13px 3px; font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-secondary); opacity:.8; }
+.ie-pop-sep { height:1px; background:var(--win-border-in); margin:4px 0; }
+.ie-fxpanel { position:absolute; top:10px; right:10px; z-index:24; width:236px; max-height:calc(100% - 20px); overflow-y:auto; padding:10px 11px; border-radius:9px; background:var(--surface); border:1px solid var(--win-border); box-shadow:0 10px 28px -10px rgba(0,0,0,.65); animation:ie-ctl-in .12s ease; }
+.ie-fxpanel .ie-sec-h { margin-top:0; }
+.ie-fxpanel input[type=color] { width:40px; height:24px; padding:0; border:1px solid var(--win-border); border-radius:5px; background:none; cursor:pointer; }
+.ie-fx-note { font-size:10px; color:var(--text-secondary); margin:-2px 0 8px; }
+.ie-fx-acts { display:flex; gap:6px; margin-top:8px; }
+.ie-fx-acts .ie-btn { flex:1; justify-content:center; }
+.ie-btn.primary { background:var(--btn-primary); border-color:var(--btn-primary); color:var(--on-accent); }
 .ie-recover { position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:25; display:flex; align-items:center; gap:8px; padding:7px 10px;
   background:var(--surface,#16161a); border:1px solid var(--win-border,#2c2c2e); border-radius:8px; font-size:11px; color:var(--text-secondary,#9a9aa3); box-shadow:0 6px 18px -8px rgba(0,0,0,.7); animation:ie-ctl-in .12s ease; }
 `
@@ -97,6 +121,7 @@ export function initImageEditor(body) {
       <button class="ie-btn" id="ie-add"><i class="fa-solid fa-layer-group"></i> ${t('ie_add_layer')}</button>
       <span class="ie-sep"></span>
       <button class="ie-btn" id="ie-crop"><i class="fa-solid fa-crop-simple"></i> ${t('ie_crop')}</button>
+      <button class="ie-btn" id="ie-docmenu"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> ${t('ie_image_menu')} <i class="fa-solid fa-chevron-down" style="font-size:8px"></i></button>
       <span class="ie-sep"></span>
       <button class="ie-btn" id="ie-export"><i class="fa-solid fa-download"></i> ${t('ie_export')}</button>
       <button class="ie-btn" id="ie-saveproj" title="${t('ie_save_proj')}"><i class="fa-solid fa-box-archive"></i></button>
@@ -131,6 +156,7 @@ export function initImageEditor(body) {
   const wrap = body.querySelector('#ie-wrap'), canvas = body.querySelector('#ie-canvas'), empty = body.querySelector('#ie-empty'), panel = body.querySelector('#ie-panel'), tabsEl = body.querySelector('#ie-tabs')
   const ctx = canvas.getContext('2d')
   const dpr = window.devicePixelRatio || 1
+  enhanceSidePanel(panel, { id: 'imgedit', min: 190, max: 480 })
 
   // Media bus: another tool sent us an image → add it as a layer (or open it).
   // Also accepts a .iceimg project reference → opened as a new document tab.
@@ -154,12 +180,14 @@ export function initImageEditor(body) {
   let regionMode = false, regionRect = null, regionStart = null, regionApply = null
   let dragging = null, dragOff = { x: 0, y: 0 }, rz = null, gpush = false
   let tool = 'move', brushColor = '#ff2ec4', brushSize = 12, brushLayer = null, brushLast = null, lassoPts = null
+  let brushOpacity = 1, prevTool = 'brush', rectStart = null
+  let fxSession = null   // effect being previewed on a layer (see startFxSession)
   let eraserSize = 20, eraserLayer = null, eraserLast = null
   let brushAnchor = null, eraserAnchor = null  // last drawn point, persists between strokes for shift+click straight line
   let wandSel = null, fillTolerance = 32       // magic wand pending selection + shared wand/bucket tolerance
   let stampSize = 34, stampStrength = 0.45, stampLayer = null, stampLast = null, stampCarry = null
   let shapeKind = 'rect', shapeFill = '#cccccc', shapeStroke = '#000000', shapeStrokeW = 0, shapeStart = null
-  let hoverPt = null, dragLayerIdx = null
+  let hoverPt = null
   const collapsed = { layers: false, adjust: false, effects: false }
 
   const uid = () => Math.random().toString(36).slice(2, 8)
@@ -332,21 +360,23 @@ export function initImageEditor(body) {
     const d = docs.find(x => x.id === id); if (!d) return
     wrap.querySelectorAll('.ie-lib-ov').forEach(o => o.remove())
     lassoPts = null; brushAnchor = null; eraserAnchor = null; brushLayer = null; eraserLayer = null; wandSel = null
-    ;['#ie-la-del', '#ie-la-move', '#ie-la-x', '#ie-wa-del', '#ie-wa-move', '#ie-wa-x'].forEach(s => body.querySelector(s)?.remove())
+    ;['#ie-la-del', '#ie-la-move', '#ie-la-x', '#ie-la-fx', '#ie-wa-del', '#ie-wa-move', '#ie-wa-x', '#ie-wa-fx'].forEach(s => body.querySelector(s)?.remove())
+    cancelFx()
     cur = d; if (regionMode) endRegion(); render(); renderPanel(); renderTabs()
   }
   function markDirty() { if (cur && !cur.dirty) { cur.dirty = true; renderTabs() } }
   // Undo / redo history (per document).
   const cloneLayer = L => {
     const c = { ...L, adj: L.adj ? { ...L.adj } : undefined }
+    delete c._fxPreview; delete c._stroke   // transient (effect preview, stroke in progress): never part of a state
     if (L.img instanceof HTMLCanvasElement) { const nc = document.createElement('canvas'); nc.width = L.img.width; nc.height = L.img.height; nc.getContext('2d', { willReadFrequently: true }).drawImage(L.img, 0, 0); c.img = nc }
     return c
   }
   const snap = () => ({ layers: cur.layers.map(cloneLayer), docW: cur.docW, docH: cur.docH, infinite: cur.infinite, sel: cur.sel })
   const applySnap = s => { cur.layers = s.layers.map(cloneLayer); cur.docW = s.docW; cur.docH = s.docH; cur.infinite = s.infinite; cur.sel = s.sel }
   function pushHistory() { if (!cur) return; cur.history.push(snap()); if (cur.history.length > 40) cur.history.shift(); cur.redo = [] }
-  function undo() { if (!cur || !cur.history.length) return; cur.redo.push(snap()); applySnap(cur.history.pop()); markDirty(); render(); renderPanel() }
-  function redo() { if (!cur || !cur.redo.length) return; cur.history.push(snap()); applySnap(cur.redo.pop()); markDirty(); render(); renderPanel() }
+  function undo() { cancelFx(); if (!cur || !cur.history.length) return; cur.redo.push(snap()); applySnap(cur.history.pop()); markDirty(); render(); renderPanel() }
+  function redo() { cancelFx(); if (!cur || !cur.redo.length) return; cur.history.push(snap()); applySnap(cur.redo.pop()); markDirty(); render(); renderPanel() }
   // Whole-document region (for saving on close, non-interactive).
   const wholeRegion = d => d.infinite ? layersBounds(d) : (d.docW ? { x: 0, y: 0, w: d.docW, h: d.docH } : null)
   async function closeDoc(id) {
@@ -392,7 +422,12 @@ export function initImageEditor(body) {
     g.globalCompositeOperation = L.blend || 'source-over'
     const w = LW(L), h = LH(L), cx = L.x + w / 2, cy = L.y + h / 2
     g.translate(cx, cy); g.rotate(L.rot * Math.PI / 180); g.translate(-cx, -cy)
-    g.drawImage(L.img, L.x, L.y, w, h); g.restore()
+    g.drawImage(L._fxPreview || L.img, L.x, L.y, w, h)
+    // A stroke in progress with a see-through brush: drawn at full strength in
+    // its own buffer and shown at the brush opacity (baked in at the end), so
+    // overlapping segments of one stroke don't darken each other.
+    if (L._stroke) { g.globalAlpha = L.opacity * L._stroke.alpha; g.drawImage(L._stroke.canvas, L.x, L.y, w, h) }
+    g.restore()
   }
   // Merge layer i down into layer i-1 (both baked with their own transform,
   // opacity, adjustments and blend mode into one flat image layer).
@@ -539,43 +574,25 @@ export function initImageEditor(body) {
   }
   function loadFile(f, asLayer) { if (!f) return; const r = new FileReader(); r.onload = () => place(r.result, f.name.replace(/\.[^.]+$/, ''), asLayer); r.readAsDataURL(f) }
 
-  // ── Effets locaux (photon-rs / imageproc / Real-ESRGAN) ────────────────────
-  let fxBusy = false
-  function layerPNG(L) {
-    const oc = document.createElement('canvas')
-    oc.width = L.img.width; oc.height = L.img.height
-    oc.getContext('2d').drawImage(L.img, 0, 0)
-    return oc.toDataURL('image/png').split(',')[1]
+  // ── Layer helpers for destructive edits ────────────────────────────────────
+  // Text and shape layers regenerate their bitmap from their properties, so a
+  // pixel edit (eraser, smudge, bucket, effect, cut) must first turn them into
+  // a plain image layer — otherwise the edit vanished at the next property
+  // change or reload.
+  function rasterize(L) {
+    if (!L || (L.type !== 'text' && L.type !== 'shape')) return
+    ensureCanvasLayer(L)
+    L.type = 'image'
+    for (const k of ['text', 'tsize', 'tcolor', 'tfont', 'tbold', 'titalic', 'shape', 'sfill', 'sstroke', 'sstrokeW', 'sflipX', 'sflipY', 'sw', 'sh', 'spad']) delete L[k]
   }
-  function replaceLayerImage(L, base64, keepFootprint) {
-    return new Promise((resolve, reject) => {
-      const im = new Image()
-      im.onload = () => {
-        if (keepFootprint) { L.sx = (L.sx || 1) * (L.img.width / im.width); L.sy = (L.sy || 1) * (L.img.height / im.height) }
-        L.img = im; resolve()
-      }
-      im.onerror = reject
-      im.src = 'data:image/png;base64,' + base64
-    })
+  // World-space bounding box of a layer (rotation included).
+  function layerBox(L) {
+    const w = LW(L), h = LH(L)
+    const pts = [[L.x, L.y], [L.x + w, L.y], [L.x + w, L.y + h], [L.x, L.y + h]].map(([x, y]) => toWorld(L, x, y))
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y)
+    return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }
   }
-  async function runFx(cmd, args, keepFootprint) {
-    if (fxBusy || !window.__TAURI__) return
-    const d = cur   // the doc the fx runs on — `cur` may change during the await (tab switch)
-    const L = layerById(d && d.sel)
-    if (!L || L.type !== 'image') { window.toast?.(t('ie_select_layer'), 'info', 1200); return }
-    fxBusy = true
-    try {
-      pushHistory()
-      const base64 = layerPNG(L)
-      const result = await window.__TAURI__.core.invoke(cmd, { base64, ...args })
-      await replaceLayerImage(L, result, keepFootprint)
-      if (d === cur) { markDirty(); render(); renderPanel() } else d.dirty = true
-    } catch (e) { console.error(e); d.history.pop(); window.toast?.(t('ie_fx_fail'), 'error') }
-    finally { fxBusy = false }
-  }
-  const applyPhotonFilter    = filter => runFx('photon_filter', { filter }, false)
-  const applyImageprocFilter = (filter, param) => runFx('imageproc_filter', { filter, param }, false)
-  const upscaleLayer         = scale => runFx('upscale_image', { scale }, true)
+  const boxesMeet = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
   // ── Panel (layers + adjustments) ───────────────────────────────────────────
   function rng(label, val, min, max, step, fmt, on) {
@@ -601,73 +618,78 @@ export function initImageEditor(body) {
   function setTool(id) {
     if (id === 'move' && lassoPts && lassoPts.length > 2) { finalizeLasso(); return }
     if (id === 'move' && wandSel) { finalizeWand(); return }
-    tool = id; canvas.style.cursor = id === 'move' ? 'default' : 'crosshair'; renderPanel()
+    if (id !== tool && tool !== 'picker') prevTool = tool
+    tool = id; canvas.style.cursor = id === 'move' ? 'default' : id === 'picker' ? 'copy' : 'crosshair'; renderPanel()
   }
   function renderPanel() {
     panel.innerHTML = ''
-    // Tools (top)
+    // Tools (top): a grid of icons (name + key in the tooltip), then the
+    // options of the active tool.
     panel.appendChild(el('div', 'ie-sec-h', t('ie_tools')))
     const tb = el('div', 'ie-tools')
-    const mk = (id, icon, lab) => { const b = el('button', 'ie-tbtn' + (tool === id ? ' on' : ''), `<i class="fa-solid ${icon}"></i><span></span>`); b.querySelector('span').textContent = t(lab); b.addEventListener('click', () => setTool(id)); return b }
-    tb.appendChild(mk('brush', 'fa-paintbrush', 'ie_tool_brush'))
+    const TOOLS_GRID = [
+      ['move', 'fa-arrow-pointer', 'ie_tool_move', 'V'], ['select', 'fa-vector-square', 'ie_tool_select', 'M'],
+      ['lasso', 'fa-draw-polygon', 'ie_tool_lasso', 'L'], ['wand', 'fa-wand-magic', 'ie_tool_wand', 'W'],
+      ['picker', 'fa-eye-dropper', 'ie_tool_picker', 'I'], ['brush', 'fa-paintbrush', 'ie_tool_brush', 'B'],
+      ['eraser', 'fa-eraser', 'ie_tool_eraser', 'E'], ['stamp', 'fa-stamp', 'ie_tool_stamp', 'S'],
+      ['bucket', 'fa-fill-drip', 'ie_tool_bucket', 'G'], ['text', 'fa-font', 'ie_tool_text', 'T'],
+      ['shape', 'fa-shapes', 'ie_tool_shape', 'U'],
+    ]
+    for (const [id, icon, lab, key] of TOOLS_GRID) {
+      const b = el('button', 'ie-tbtn' + (tool === id ? ' on' : ''), `<i class="fa-solid ${icon}"></i>`)
+      b.title = t(lab) + ' (' + key + ')'
+      b.addEventListener('click', () => setTool(id))
+      tb.appendChild(b)
+    }
+    const colorInput = (get, set) => {
+      const ci = el('input'); ci.type = 'color'; ci.value = get(); ci.style.cssText = 'width:40px;height:24px;padding:0;border:1px solid var(--win-border,#2a2a2a);border-radius:5px;background:none;cursor:pointer'
+      ci.addEventListener('input', () => set(ci.value))
+      return ci
+    }
+    const slider = (label, min, max, val, fmt, set, last) => {
+      const f = el('div', 'ie-field'); if (last) f.style.marginBottom = '0'; f.appendChild(el('label', null, label))
+      const r = el('input'); r.type = 'range'; r.min = min; r.max = max; r.value = val   // sized by .ie-brush-ctl CSS
+      const v = el('span', 'v', fmt(val))
+      r.addEventListener('input', () => { set(+r.value); v.textContent = fmt(+r.value) })
+      f.append(r, v); return f
+    }
     if (tool === 'brush') {
       const bc = el('div', 'ie-brush-ctl')
       const cf = el('div', 'ie-field'); cf.appendChild(el('label', null, t('ie_color')))
-      const ci = el('input'); ci.type = 'color'; ci.value = brushColor; ci.style.cssText = 'width:40px;height:24px;padding:0;border:1px solid var(--win-border,#2a2a2a);border-radius:5px;background:none;cursor:pointer'
-      ci.addEventListener('input', () => { brushColor = ci.value })
+      const ci = colorInput(() => brushColor, v => { brushColor = v })
       const pb = el('button'); pb.innerHTML = '<i class="fa-solid fa-palette" style="font-size:10px"></i>'; pb.style.cssText = 'width:24px;height:24px;border-radius:5px;border:1px solid var(--win-border,#2a2a2a);background:var(--surface2);color:var(--text-secondary);cursor:pointer;padding:0;flex-shrink:0'
       pb.addEventListener('click', () => showPalPicker(pb, c => { brushColor = c; ci.value = c }))
       cf.append(ci, pb); bc.appendChild(cf)
-      const sf = el('div', 'ie-field'); sf.style.marginBottom = '0'; sf.appendChild(el('label', null, t('ie_size')))
-      const sr = el('input'); sr.type = 'range'; sr.min = 1; sr.max = 120; sr.value = brushSize; sr.style.cssText = 'flex:1;min-width:0'
-      const sv = el('span', 'v', Math.round(brushSize) + 'px')
-      sr.addEventListener('input', () => { brushSize = +sr.value; sv.textContent = Math.round(brushSize) + 'px' })
-      sf.append(sr, sv); bc.appendChild(sf); tb.appendChild(bc)
+      bc.appendChild(slider(t('ie_size'), 1, 120, brushSize, v => Math.round(v) + 'px', v => { brushSize = v }))
+      bc.appendChild(slider(t('ie_opacity'), 5, 100, Math.round(brushOpacity * 100), v => Math.round(v) + '%', v => { brushOpacity = v / 100 }, true))
+      tb.appendChild(bc)
     }
-    tb.appendChild(mk('eraser', 'fa-eraser', 'ie_tool_eraser'))
     if (tool === 'eraser') {
       const ec = el('div', 'ie-brush-ctl')
-      const sf = el('div', 'ie-field'); sf.style.marginBottom = '0'; sf.appendChild(el('label', null, t('ie_size')))
-      const sr = el('input'); sr.type = 'range'; sr.min = 1; sr.max = 200; sr.value = eraserSize; sr.style.cssText = 'flex:1;min-width:0'
-      const sv = el('span', 'v', Math.round(eraserSize) + 'px')
-      sr.addEventListener('input', () => { eraserSize = +sr.value; sv.textContent = Math.round(eraserSize) + 'px' })
-      sf.append(sr, sv); ec.appendChild(sf); tb.appendChild(ec)
+      ec.appendChild(slider(t('ie_size'), 1, 200, eraserSize, v => Math.round(v) + 'px', v => { eraserSize = v }, true))
+      tb.appendChild(ec)
     }
-    tb.appendChild(mk('stamp', 'fa-stamp', 'ie_tool_stamp'))
     if (tool === 'stamp') {
       const sc = el('div', 'ie-brush-ctl')
-      const sf = el('div', 'ie-field'); sf.appendChild(el('label', null, t('ie_size')))
-      const sr = el('input'); sr.type = 'range'; sr.min = 6; sr.max = 150; sr.value = stampSize; sr.style.cssText = 'flex:1;min-width:0'
-      const sv = el('span', 'v', Math.round(stampSize) + 'px')
-      sr.addEventListener('input', () => { stampSize = +sr.value; sv.textContent = Math.round(stampSize) + 'px' })
-      sf.append(sr, sv); sc.appendChild(sf)
-      const stf = el('div', 'ie-field'); stf.style.marginBottom = '0'; stf.appendChild(el('label', null, t('ie_strength')))
-      const str = el('input'); str.type = 'range'; str.min = 5; str.max = 100; str.value = Math.round(stampStrength * 100); str.style.cssText = 'flex:1;min-width:0'
-      const stv = el('span', 'v', Math.round(stampStrength * 100) + '%')
-      str.addEventListener('input', () => { stampStrength = +str.value / 100; stv.textContent = str.value + '%' })
-      stf.append(str, stv); sc.appendChild(stf); tb.appendChild(sc)
+      sc.appendChild(slider(t('ie_size'), 6, 150, stampSize, v => Math.round(v) + 'px', v => { stampSize = v }))
+      sc.appendChild(slider(t('ie_strength'), 5, 100, Math.round(stampStrength * 100), v => Math.round(v) + '%', v => { stampStrength = v / 100 }, true))
+      tb.appendChild(sc)
     }
-    tb.appendChild(mk('move', 'fa-arrow-pointer', 'ie_tool_move'))
-    tb.appendChild(mk('lasso', 'fa-draw-polygon', 'ie_tool_lasso'))
-    tb.appendChild(mk('wand', 'fa-wand-magic', 'ie_tool_wand'))
-    tb.appendChild(mk('bucket', 'fa-fill-drip', 'ie_tool_bucket'))
     if (tool === 'wand' || tool === 'bucket') {
       const wc = el('div', 'ie-brush-ctl')
-      const sf = el('div', 'ie-field'); sf.style.marginBottom = tool === 'bucket' ? '6px' : '0'; sf.appendChild(el('label', null, t('ie_tolerance')))
-      const sr = el('input'); sr.type = 'range'; sr.min = 0; sr.max = 128; sr.value = fillTolerance; sr.style.cssText = 'flex:1;min-width:0'
-      const sv = el('span', 'v', String(Math.round(fillTolerance)))
-      sr.addEventListener('input', () => { fillTolerance = +sr.value; sv.textContent = String(Math.round(fillTolerance)) })
-      sf.append(sr, sv); wc.appendChild(sf)
+      wc.appendChild(slider(t('ie_tolerance'), 0, 128, fillTolerance, v => String(Math.round(v)), v => { fillTolerance = v }, tool !== 'bucket'))
       if (tool === 'bucket') {
         const cf = el('div', 'ie-field'); cf.style.marginBottom = '0'; cf.appendChild(el('label', null, t('ie_color')))
-        const ci = el('input'); ci.type = 'color'; ci.value = brushColor; ci.style.cssText = 'width:40px;height:24px;padding:0;border:1px solid var(--win-border,#2a2a2a);border-radius:5px;background:none;cursor:pointer'
-        ci.addEventListener('input', () => { brushColor = ci.value })
-        cf.appendChild(ci); wc.appendChild(cf)
+        cf.appendChild(colorInput(() => brushColor, v => { brushColor = v })); wc.appendChild(cf)
       }
       tb.appendChild(wc)
     }
-    tb.appendChild(mk('text', 'fa-font', 'ie_tool_text'))
-    tb.appendChild(mk('shape', 'fa-shapes', 'ie_tool_shape'))
+    if (tool === 'picker') {
+      const pc = el('div', 'ie-brush-ctl')
+      const cf = el('div', 'ie-field'); cf.style.marginBottom = '0'; cf.appendChild(el('label', null, t('ie_color')))
+      cf.appendChild(colorInput(() => brushColor, v => { brushColor = v }))
+      pc.appendChild(cf); tb.appendChild(pc)
+    }
     if (tool === 'shape') {
       const sc = el('div', 'ie-brush-ctl')
       const kf = el('div', 'ie-field'); kf.appendChild(el('label', null, t('ie_tool_shape')))
@@ -677,19 +699,11 @@ export function initImageEditor(body) {
       kf.appendChild(ks); sc.appendChild(kf)
       if (shapeKind !== 'line') {
         const ff = el('div', 'ie-field'); ff.appendChild(el('label', null, t('ie_fill_color')))
-        const fi = el('input'); fi.type = 'color'; fi.value = shapeFill; fi.style.cssText = 'width:40px;height:24px;padding:0;border:1px solid var(--win-border,#2a2a2a);border-radius:5px;background:none;cursor:pointer'
-        fi.addEventListener('input', () => { shapeFill = fi.value })
-        ff.appendChild(fi); sc.appendChild(ff)
+        ff.appendChild(colorInput(() => shapeFill, v => { shapeFill = v })); sc.appendChild(ff)
       }
       const stf = el('div', 'ie-field'); stf.appendChild(el('label', null, t('ie_stroke')))
-      const sti = el('input'); sti.type = 'color'; sti.value = shapeStroke; sti.style.cssText = 'width:40px;height:24px;padding:0;border:1px solid var(--win-border,#2a2a2a);border-radius:5px;background:none;cursor:pointer'
-      sti.addEventListener('input', () => { shapeStroke = sti.value })
-      stf.appendChild(sti); sc.appendChild(stf)
-      const swf = el('div', 'ie-field'); swf.style.marginBottom = '0'; swf.appendChild(el('label', null, t('ie_stroke_w')))
-      const swr = el('input'); swr.type = 'range'; swr.min = 0; swr.max = 40; swr.value = shapeStrokeW; swr.style.cssText = 'flex:1;min-width:0'
-      const swv = el('span', 'v', shapeStrokeW + 'px')
-      swr.addEventListener('input', () => { shapeStrokeW = +swr.value; swv.textContent = shapeStrokeW + 'px' })
-      swf.append(swr, swv); sc.appendChild(swf)
+      stf.appendChild(colorInput(() => shapeStroke, v => { shapeStroke = v })); sc.appendChild(stf)
+      sc.appendChild(slider(t('ie_stroke_w'), 0, 40, shapeStrokeW, v => v + 'px', v => { shapeStrokeW = v }, true))
       tb.appendChild(sc)
     }
     panel.appendChild(tb)
@@ -716,20 +730,10 @@ export function initImageEditor(body) {
             try { tg.drawImage(L.img, (26 - w) / 2, (20 - h) / 2, w, h) } catch {}
           }
         }
-        // Drag to reorder (replaces the old chevron pair)
-        row.draggable = true
-        row.addEventListener('dragstart', e2 => { dragLayerIdx = i; e2.dataTransfer.effectAllowed = 'move'; row.style.opacity = '.4' })
-        row.addEventListener('dragend', () => { row.style.opacity = ''; dragLayerIdx = null })
-        row.addEventListener('dragover', e2 => { e2.preventDefault() })
-        row.addEventListener('drop', e2 => {
-          e2.preventDefault()
-          if (dragLayerIdx == null || dragLayerIdx === i) return
-          pushHistory()
-          const [m] = cur.layers.splice(dragLayerIdx, 1)
-          cur.layers.splice(dragLayerIdx < i ? i - 1 : i, 0, m)
-          dragLayerIdx = null
-          markDirty(); render(); renderPanel()
-        })
+        // Drag to reorder with the pointer (HTML5 drag-and-drop is captured by
+        // the desktop webview's file drop, so it never reached the rows there).
+        row.dataset.idx = i
+        if (L.type !== 'fill') row.addEventListener('pointerdown', e2 => startLayerDrag(e2, row, i))
         row.querySelector('.mrg')?.addEventListener('click', e2 => { e2.stopPropagation(); mergeDown(i) })
         row.querySelector('.nm').textContent = L.name
         row.querySelector('.nm').addEventListener('click', () => { cur.sel = L.id; render(); renderPanel() })
@@ -837,39 +841,17 @@ export function initImageEditor(body) {
     reset.addEventListener('click', () => { pushHistory(); L.opacity = 1; L.sx = 1; L.sy = 1; L.rot = 0; L.adj = { b: 1, c: 1, s: 1, h: 0 }; markDirty(); render(); renderPanel() })
     box.appendChild(reset); panel.appendChild(box)
 
-    // Effets locaux (destructifs, "cuits" dans le calque source) : filtres photon-rs,
-    // filtres imageproc, et amélioration IA via Real-ESRGAN (si le sidecar est présent).
-    if (window.__TAURI__) {
-      panel.appendChild(secHead('ie_effects', 'effects'))
-      if (!collapsed.effects) {
-        const fx = el('div', 'ie-adjbox')
-        const fxBtn = (icon, labKey, run) => {
-          const b = el('button', 'ie-btn', `<i class="fa-solid ${icon}"></i> ${t(labKey)}`)
-          b.style.cssText = 'flex:1;min-width:calc(50% - 3px);justify-content:center;font-size:10px;padding:0 6px'
-          b.addEventListener('click', run)
-          return b
-        }
-        const fxRow = el('div'); fxRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px'
-        fxRow.append(
-          fxBtn('fa-droplet-slash',        'ie_fx_grayscale', () => applyPhotonFilter('grayscale')),
-          fxBtn('fa-swatchbook',           'ie_fx_sepia',      () => applyPhotonFilter('sepia')),
-          fxBtn('fa-icicles',              'ie_fx_sharpen',    () => applyPhotonFilter('sharpen')),
-          fxBtn('fa-border-all',           'ie_fx_edges',      () => applyPhotonFilter('edges')),
-          fxBtn('fa-water',                'ie_fx_blur',       () => applyImageprocFilter('blur', 4)),
-          fxBtn('fa-draw-polygon',         'ie_fx_canny',      () => applyImageprocFilter('canny', 50)),
-        )
-        fx.appendChild(fxRow)
-        fx.appendChild(el('label', null, t('ie_fx_upscale')))
-        const upRow = el('div'); upRow.style.cssText = 'display:flex;gap:5px;margin-top:5px'
-        ;[2, 3, 4].forEach(s => {
-          const b = el('button', 'ie-btn', `<i class="fa-solid fa-wand-magic-sparkles"></i> x${s}`)
-          b.style.cssText = 'flex:1;justify-content:center;font-size:10px'
-          b.addEventListener('click', () => upscaleLayer(s))
-          upRow.appendChild(b)
-        })
-        fx.appendChild(upRow)
-        panel.appendChild(fx)
-      }
+    // Effects: the same engine as the Effects tool, applied to the selected
+    // layer — or only inside the pending selection (rectangle, lasso, wand).
+    panel.appendChild(secHead('ie_effects', 'effects'))
+    if (!collapsed.effects) {
+      const fx = el('div', 'ie-adjbox')
+      fx.appendChild(el('div', 'ie-fx-note', t(pendingSelection() ? 'ie_fx_on_sel' : 'ie_fx_on_layer')))
+      const add = el('button', 'ie-btn', `<i class="fa-solid fa-wand-magic-sparkles"></i> ${t('ie_fx_add')}`)
+      add.style.cssText = 'width:100%;justify-content:center;margin-bottom:4px'
+      add.addEventListener('click', () => openFxMenu(add))
+      fx.appendChild(add)
+      panel.appendChild(fx)
     }
   }
 
@@ -961,6 +943,8 @@ export function initImageEditor(body) {
     if (e.button !== 0) return
     const p = toDoc(e)
     if (regionMode) { regionStart = p; regionRect = { x: p.x, y: p.y, w: 0, h: 0 }; dragging = 'region'; return }
+    if (tool === 'picker' || (e.altKey && ['brush', 'bucket', 'text', 'shape'].includes(tool))) { pickColor(p); return }
+    if (tool === 'select') { clearLasso(); clearWand(); rectStart = p; lassoPts = [p, { ...p }, { ...p }, { ...p }]; dragging = 'rectsel'; try { canvas.setPointerCapture(e.pointerId) } catch {} return }
     if (tool === 'brush') { startBrush(p, e); try { canvas.setPointerCapture(e.pointerId) } catch {} return }
     if (tool === 'eraser') { startEraser(p, e); try { canvas.setPointerCapture(e.pointerId) } catch {} return }
     if (tool === 'lasso') { clearLasso(); lassoPts = [p]; dragging = 'lasso'; try { canvas.setPointerCapture(e.pointerId) } catch {} return }
@@ -1010,7 +994,7 @@ export function initImageEditor(body) {
         const lpx = worldToLayerPixel(L, p.x, p.y)
         const res = floodFillMask(L, lpx.x, lpx.y, fillTolerance)
         if (res) {
-          pushHistory()
+          pushHistory(); rasterize(L)
           const g = L.img.getContext('2d')
           const id = g.getImageData(0, 0, L.img.width, L.img.height)
           const rgb = hexToRgb(brushColor)
@@ -1047,6 +1031,7 @@ export function initImageEditor(body) {
     else if (dragging === 'brush') { drawBrushSeg(brushLayer, brushLast, p); brushLast = p; markDirty(); render() }
     else if (dragging === 'eraser') { drawEraserSeg(eraserLayer, eraserLast, p); eraserLast = p; markDirty(); render() }
     else if (dragging === 'lasso') { lassoPts.push(p); render() }
+    else if (dragging === 'rectsel') { lassoPts = [rectStart, { x: p.x, y: rectStart.y }, p, { x: rectStart.x, y: p.y }]; render() }
     else if (dragging === 'stamp') { drawStampSeg(stampLayer, stampLast, p); stampLast = p; markDirty(); render() }
     else if (dragging === 'move') { const L = layerById(cur.sel); if (L) { if (gpush) { pushHistory(); gpush = false } L.x = Math.round(p.x - dragOff.x); L.y = Math.round(p.y - dragOff.y); markDirty(); render() } }
     else if (dragging === 'resize') {
@@ -1071,6 +1056,7 @@ export function initImageEditor(body) {
   window.addEventListener('pointermove', onPointerMove)
   // Hover position for the brush-size cursor preview.
   canvas.addEventListener('pointermove', e => {
+    canvas.style.cursor = tool === 'picker' || (e.altKey && ['brush', 'bucket', 'text', 'shape'].includes(tool)) ? 'copy' : tool === 'move' ? 'default' : 'crosshair'
     if (!['brush', 'eraser', 'stamp'].includes(tool)) { if (hoverPt) { hoverPt = null; render() } return }
     const r = canvas.getBoundingClientRect()
     hoverPt = { x: e.clientX - r.left, y: e.clientY - r.top }
@@ -1093,8 +1079,8 @@ export function initImageEditor(body) {
   const endDrag = () => {
     if (dragging === 'pan') canvas.style.cursor = tool === 'move' ? 'default' : 'crosshair'
     if (dragging === 'shape-create') renderPanel()
-    if (dragging === 'lasso') { if (lassoPts && lassoPts.length > 2) showLassoActions(); else { lassoPts = null; render() } }
-    if (dragging === 'brush') { brushAnchor = brushLast; renderPanel() }
+    if (dragging === 'lasso' || dragging === 'rectsel') { if (lassoPts && lassoPts.length > 2) showLassoActions(); else { lassoPts = null; render() } }
+    if (dragging === 'brush') { bakeStroke(brushLayer); brushAnchor = brushLast; renderPanel() }
     if (dragging === 'eraser') { eraserAnchor = eraserLast; renderPanel() }
     if (dragging === 'resize' || dragging === 'move') renderPanel()
     dragging = null; gpush = false
@@ -1166,7 +1152,7 @@ export function initImageEditor(body) {
   }
   function drawBrushSeg(L, a, b) {
     if (!L) return
-    const g = L.img.getContext('2d')
+    const g = (L._stroke ? L._stroke.canvas : L.img).getContext('2d')
     const kx = L.sx || 1, ky = L.sy || 1
     // World → the layer's own unrotated pixel space (same fix as erasePoly):
     // painting on a rotated layer must land where the cursor visually is.
@@ -1184,10 +1170,29 @@ export function initImageEditor(body) {
     if (!L || L.type !== 'paint') L = newPaintLayer()
     const straight = e && straightModHeld(e) && brushAnchor && brushLayer === L
     pushHistory()
+    if (brushOpacity < 0.999) {
+      const c = document.createElement('canvas'); c.width = L.img.width; c.height = L.img.height
+      L._stroke = { canvas: c, alpha: brushOpacity }
+    }
     brushLayer = L; brushLast = p; dragging = 'brush'
     if (straight) drawBrushSeg(L, brushAnchor, p)
     else drawBrushSeg(L, p, p)
     markDirty(); render(); renderPanel()
+  }
+  function bakeStroke(L) {
+    if (!L || !L._stroke) return
+    const g = L.img.getContext('2d'); g.save(); g.globalAlpha = L._stroke.alpha; g.drawImage(L._stroke.canvas, 0, 0); g.restore()
+    delete L._stroke; render()
+  }
+  // Eyedropper: the colour of the composed picture under the cursor.
+  function pickColor(p) {
+    const px = compositeRegion(cur, { x: Math.floor(p.x), y: Math.floor(p.y), w: 1, h: 1 }).getContext('2d').getImageData(0, 0, 1, 1).data
+    if (px[3] < 8) return
+    brushColor = '#' + [px[0], px[1], px[2]].map(v => v.toString(16).padStart(2, '0')).join('')
+    if (tool === 'shape') shapeFill = brushColor
+    window.toast?.(t('ie_picked') + ' ' + brushColor, 'info', 1200)
+    if (tool === 'picker' && ['brush', 'bucket', 'text', 'shape'].includes(prevTool)) setTool(prevTool)
+    else renderPanel()
   }
   function drawEraserSeg(L, a, b) {
     if (!L) return
@@ -1210,9 +1215,8 @@ export function initImageEditor(body) {
   function startEraser(p, e) {
     const L = layerById(cur.sel)
     if (!L || L.type === 'fill') return
-    ensureCanvasLayer(L)
     const straight = e && straightModHeld(e) && eraserAnchor && eraserLayer === L
-    pushHistory()
+    pushHistory(); rasterize(L); ensureCanvasLayer(L)
     eraserLayer = L; eraserLast = p; dragging = 'eraser'
     if (straight) drawEraserSeg(L, eraserAnchor, p)
     else drawEraserSeg(L, p, p)
@@ -1221,10 +1225,10 @@ export function initImageEditor(body) {
 
   // ── Lasso selection: trace around content → lift it into a movable layer ────
   const polyBounds = pts => { let a = Infinity, b = Infinity, c = -Infinity, d = -Infinity; for (const p of pts) { a = Math.min(a, p.x); b = Math.min(b, p.y); c = Math.max(c, p.x); d = Math.max(d, p.y) } return { x: Math.round(a), y: Math.round(b), w: Math.round(c - a), h: Math.round(d - b) } }
-  function clearLasso() { ;['#ie-la-del', '#ie-la-move', '#ie-la-x'].forEach(s => body.querySelector(s)?.remove()); lassoPts = null; render() }
+  function clearLasso() { removeLassoBar(); lassoPts = null; render(); if (panel.querySelector('.ie-fx-note')) renderPanel() }
   function ensureCanvasLayer(L) { if (L.img instanceof HTMLCanvasElement) return; const c = document.createElement('canvas'); c.width = L.img.width; c.height = L.img.height; c.getContext('2d', { willReadFrequently: true }).drawImage(L.img, 0, 0); L.img = c }
   function erasePoly(L, pts) {
-    ensureCanvasLayer(L); const g = L.img.getContext('2d'), kx = L.sx || 1, ky = L.sy || 1
+    rasterize(L); ensureCanvasLayer(L); const g = L.img.getContext('2d'), kx = L.sx || 1, ky = L.sy || 1
     g.save(); g.globalCompositeOperation = 'destination-out'
     // Project each world-space lasso point into the layer's own unrotated
     // pixel space first — otherwise erasing from a rotated layer cuts the
@@ -1233,7 +1237,7 @@ export function initImageEditor(body) {
   }
   // On release: cut the traced region out of the content layers into a new layer,
   // select it and switch to Move so it can be dragged straight away.
-  function removeLassoBar() { ;['#ie-la-del', '#ie-la-move', '#ie-la-x'].forEach(s => body.querySelector(s)?.remove()) }
+  function removeLassoBar() { ;['#ie-la-del', '#ie-la-move', '#ie-la-x', '#ie-la-fx'].forEach(s => body.querySelector(s)?.remove()) }
   function finalizeLasso() {
     removeLassoBar()
     if (!lassoPts || lassoPts.length < 3) { clearLasso(); return }
@@ -1244,7 +1248,7 @@ export function initImageEditor(body) {
     g.translate(-bb.x, -bb.y)
     for (const L of cur.layers) if (L.visible && L.type !== 'fill') drawLayerInto(g, L)
     g.restore()
-    for (const L of [...cur.layers]) if (L.visible && L.type !== 'fill') erasePoly(L, lassoPts)
+    for (const L of [...cur.layers]) if (L.visible && L.type !== 'fill' && boxesMeet(layerBox(L), bb)) erasePoly(L, lassoPts)
     cur.layers.push({ id: uid(), type: 'image', name: t('ie_selection'), img: oc, x: bb.x, y: bb.y, sx: 1, sy: 1, rot: 0, opacity: 1, visible: true, adj: { b: 1, c: 1, s: 1, h: 0 } })
     cur.sel = cur.layers[cur.layers.length - 1].id
     markDirty(); lassoPts = null; setTool('move'); render(); renderPanel()
@@ -1253,7 +1257,8 @@ export function initImageEditor(body) {
     removeLassoBar()
     if (!lassoPts || lassoPts.length < 3) { clearLasso(); return }
     pushHistory()
-    for (const L of [...cur.layers]) if (L.visible && L.type !== 'fill') erasePoly(L, lassoPts)
+    const bb = polyBounds(lassoPts)
+    for (const L of [...cur.layers]) if (L.visible && L.type !== 'fill' && boxesMeet(layerBox(L), bb)) erasePoly(L, lassoPts)
     markDirty(); lassoPts = null; render(); renderPanel()
   }
   function showLassoActions() {
@@ -1264,19 +1269,22 @@ export function initImageEditor(body) {
     const delBtn = el('button', 'ie-btn', `<i class="fa-solid fa-trash"></i> ${t('ie_lasso_delete')}`); delBtn.id = 'ie-la-del'
     const moveBtn = el('button', 'ie-btn', `<i class="fa-solid fa-up-down-left-right"></i> ${t('ie_lasso_move')}`); moveBtn.id = 'ie-la-move'
     const cancelBtn = el('button', 'ie-btn', `<i class="fa-solid fa-xmark"></i> ${t('ie_crop_cancel')}`); cancelBtn.id = 'ie-la-x'
+    const fxB = el('button', 'ie-btn', `<i class="fa-solid fa-wand-magic-sparkles"></i> ${t('ie_effects')}`); fxB.id = 'ie-la-fx'
     delBtn.addEventListener('click', deleteLassoRegion)
     moveBtn.addEventListener('click', finalizeLasso)
     cancelBtn.addEventListener('click', () => clearLasso())
-    bar.append(delBtn, moveBtn, cancelBtn)
+    fxB.addEventListener('click', () => openFxMenu(fxB))
+    bar.append(delBtn, moveBtn, fxB, cancelBtn)
+    renderPanel()
   }
 
   // ── Magic wand: click → flood-fill a mask by colour similarity, then the
   // same Delete/Move/Cancel flow as the lasso, but over a raster mask instead
   // of a polygon (handles disjoint / non-convex regions the lasso can't).
-  function removeWandBar() { ;['#ie-wa-del', '#ie-wa-move', '#ie-wa-x'].forEach(s => body.querySelector(s)?.remove()) }
-  function clearWand() { removeWandBar(); wandSel = null; render() }
+  function removeWandBar() { ;['#ie-wa-del', '#ie-wa-move', '#ie-wa-x', '#ie-wa-fx'].forEach(s => body.querySelector(s)?.remove()) }
+  function clearWand() { removeWandBar(); wandSel = null; render(); if (panel.querySelector('.ie-fx-note')) renderPanel() }
   function eraseMask(L, mask) {
-    ensureCanvasLayer(L)
+    rasterize(L); ensureCanvasLayer(L)
     const g = L.img.getContext('2d')
     const id = g.getImageData(0, 0, L.img.width, L.img.height)
     for (let i = 0; i < mask.length; i++) if (mask[i]) id.data[i * 4 + 3] = 0
@@ -1288,7 +1296,7 @@ export function initImageEditor(body) {
     const { L, mask, w: mw, bbox } = wandSel
     if (bbox.w < 1 || bbox.h < 1) { clearWand(); return }
     pushHistory()
-    ensureCanvasLayer(L)
+    rasterize(L); ensureCanvasLayer(L)
     const src = L.img.getContext('2d').getImageData(0, 0, L.img.width, L.img.height)
     const out = document.createElement('canvas'); out.width = bbox.w; out.height = bbox.h
     const og = out.getContext('2d'), oid = og.createImageData(bbox.w, bbox.h)
@@ -1324,10 +1332,13 @@ export function initImageEditor(body) {
     const delBtn = el('button', 'ie-btn', `<i class="fa-solid fa-trash"></i> ${t('ie_lasso_delete')}`); delBtn.id = 'ie-wa-del'
     const moveBtn = el('button', 'ie-btn', `<i class="fa-solid fa-up-down-left-right"></i> ${t('ie_lasso_move')}`); moveBtn.id = 'ie-wa-move'
     const cancelBtn = el('button', 'ie-btn', `<i class="fa-solid fa-xmark"></i> ${t('ie_crop_cancel')}`); cancelBtn.id = 'ie-wa-x'
+    const fxB = el('button', 'ie-btn', `<i class="fa-solid fa-wand-magic-sparkles"></i> ${t('ie_effects')}`); fxB.id = 'ie-wa-fx'
     delBtn.addEventListener('click', deleteWandRegion)
     moveBtn.addEventListener('click', finalizeWand)
     cancelBtn.addEventListener('click', () => clearWand())
-    bar.append(delBtn, moveBtn, cancelBtn)
+    fxB.addEventListener('click', () => openFxMenu(fxB))
+    bar.append(delBtn, moveBtn, fxB, cancelBtn)
+    renderPanel()
   }
 
   // ── Stamp (smudge): drag to smear existing colours together, like blending
@@ -1345,8 +1356,7 @@ export function initImageEditor(body) {
   function startStamp(p) {
     let L = layerById(cur.sel)
     if (!L || L.type === 'fill') return
-    ensureCanvasLayer(L)
-    pushHistory()
+    pushHistory(); rasterize(L); ensureCanvasLayer(L)
     stampLayer = L; stampLast = p; dragging = 'stamp'
     stampCarry = sampleStampRegion(L, p)
     markDirty(); render()
@@ -1388,8 +1398,17 @@ export function initImageEditor(body) {
   // ── Copy / paste images (Ctrl+C / Ctrl+V while hovering the editor) ─────────
   function copyCanvas() {
     if (!cur) return null
+    if (lassoPts && lassoPts.length > 2) {
+      const bb = polyBounds(lassoPts)
+      if (bb.w >= 1 && bb.h >= 1) {
+        const c = document.createElement('canvas'); c.width = bb.w; c.height = bb.h; const g = c.getContext('2d')
+        g.beginPath(); lassoPts.forEach((p, i) => { const x = p.x - bb.x, y = p.y - bb.y; i ? g.lineTo(x, y) : g.moveTo(x, y) }); g.closePath(); g.clip()
+        g.translate(-bb.x, -bb.y); for (const L2 of cur.layers) if (L2.visible) drawLayerInto(g, L2)
+        return c
+      }
+    }
     const L = layerById(cur.sel)
-    if (L) {
+    if (L && L.type !== 'fill') {
       const w = Math.max(1, Math.round(LW(L))), h = Math.max(1, Math.round(LH(L)))
       const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d')
       g.globalAlpha = L.opacity; g.filter = filterStr(L.adj); g.drawImage(L.img, 0, 0, w, h); return c
@@ -1430,13 +1449,18 @@ export function initImageEditor(body) {
     if (e.altKey) return
     if (e.key === 'Escape') {
       e.preventDefault(); e.stopPropagation()
-      if (regionMode) { endRegion(); render() }
+      if (fxSession) cancelFx()
+      else if (regionMode) { endRegion(); render() }
       else if (lassoPts) clearLasso()
       else if (wandSel) clearWand()
       else if (cur && cur.sel) { cur.sel = null; render(); renderPanel() }
       return
     }
-    if (e.key === 'Delete') {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      // A pending selection: erase what it encloses, not the whole layer.
+      if (lassoPts && lassoPts.length > 2) { e.preventDefault(); e.stopPropagation(); deleteLassoRegion(); return }
+      if (wandSel) { e.preventDefault(); e.stopPropagation(); deleteWandRegion(); return }
+      if (e.key === 'Backspace') return
       const L = layerById(cur && cur.sel)
       if (L) {
         e.preventDefault(); e.stopPropagation()
@@ -1447,7 +1471,7 @@ export function initImageEditor(body) {
       }
       return
     }
-    const HOTKEYS = { b: 'brush', e: 'eraser', s: 'stamp', v: 'move', l: 'lasso', w: 'wand', g: 'bucket', t: 'text', u: 'shape' }
+    const HOTKEYS = { b: 'brush', e: 'eraser', s: 'stamp', v: 'move', m: 'select', l: 'lasso', w: 'wand', i: 'picker', g: 'bucket', t: 'text', u: 'shape' }
     if (HOTKEYS[k]) { e.preventDefault(); setTool(HOTKEYS[k]) }
   }
   document.addEventListener('keydown', onCopy)
@@ -1478,10 +1502,292 @@ export function initImageEditor(body) {
     bar.append(ap, ca); render()
   }
   function doCrop(r) {
+    if (!cur.infinite && cur.docW) {
+      const x1 = Math.min(cur.docW, r.x + r.w), y1 = Math.min(cur.docH, r.y + r.h)
+      r.x = Math.max(0, r.x); r.y = Math.max(0, r.y); r.w = x1 - r.x; r.h = y1 - r.y
+      if (r.w < 4 || r.h < 4) return
+    }
     pushHistory()
-    r.x = Math.max(0, r.x); r.y = Math.max(0, r.y)
     cur.layers.forEach(L => { L.x -= r.x; L.y -= r.y }); cur.docW = r.w; cur.docH = r.h; cur.infinite = false
     markDirty(); render()
+  }
+
+  // ── Effects on a layer / a selection ────────────────────────────────────────
+  // The Effects tool's engine (fx-engine.js). Picking an effect opens a small
+  // panel with its settings; the preview is computed on a reduced copy of the
+  // layer and shown in place; Apply renders at full size and bakes it in (one
+  // undo step). With a pending selection, only the selected pixels change.
+  const pendingSelection = () => !!((lassoPts && lassoPts.length > 2) || wandSel)
+  function showPop(anchor, items) {
+    document.getElementById('ie-pop')?.remove()
+    const pop = el('div', 'ie-pop'); pop.id = 'ie-pop'
+    for (const it of items) {
+      if (it.sep) { pop.appendChild(el('div', 'ie-pop-sep')); continue }
+      if (it.head) { const h = el('div', 'ie-pop-head'); h.textContent = it.head; pop.appendChild(h); continue }
+      const row = el('div', 'ie-pop-item', `<i class="fa-solid ${it.icon || 'fa-circle'}"></i><span></span>`)
+      row.querySelector('span').textContent = it.label
+      row.addEventListener('click', () => { pop.remove(); it.action() })
+      pop.appendChild(row)
+    }
+    document.body.appendChild(pop)
+    const r = anchor.getBoundingClientRect()
+    pop.style.left = Math.max(6, Math.min(r.left, window.innerWidth - pop.offsetWidth - 8)) + 'px'
+    let top = r.bottom + 4
+    if (top + pop.offsetHeight > window.innerHeight - 6) top = Math.max(6, r.top - pop.offsetHeight - 4)
+    pop.style.top = top + 'px'
+    setTimeout(() => document.addEventListener('click', () => pop.remove(), { once: true }), 0)
+  }
+  function openFxMenu(anchor) {
+    const L = fxTarget()
+    if (!L) { window.toast?.(t('ie_select_layer'), 'info', 1400); return }
+    const items = []
+    fxGroups().forEach(([key, ids], gi) => {
+      if (gi) items.push({ sep: true })
+      items.push({ head: t(key) })
+      for (const id of ids) { const def = FX[id]; items.push({ icon: def.icon, label: fxName(def), action: () => startFxSession(fxName(def), [{ type: id, params: defaultParams(def) }]) }) }
+    })
+    items.push({ sep: true }, { head: t('fx_presets') })
+    for (const pr of BUILTIN) items.push({ icon: 'fa-layer-group', label: pr.name, action: () => startFxSession(pr.name, pr.effects.filter(e => resolveFX(e.type)).map(e => ({ type: e.type, params: { ...defaultParams(resolveFX(e.type)), ...e.params } }))) })
+    showPop(anchor, items)
+  }
+  // The layer an effect works on: the wand's layer, else the selected one.
+  function fxTarget() {
+    const L = wandSel ? wandSel.L : layerById(cur && cur.sel)
+    return L && L.type !== 'fill' && L.img ? L : null
+  }
+  // Alpha mask (layer pixel space) of the pending selection, or null.
+  function selectionMask(L) {
+    const w = L.img.width, h = L.img.height
+    if (wandSel && wandSel.L === L) {
+      const c = document.createElement('canvas'); c.width = w; c.height = h
+      const g = c.getContext('2d'), id = g.createImageData(w, h)
+      for (let i = 0; i < wandSel.mask.length; i++) if (wandSel.mask[i]) id.data[i * 4 + 3] = 255
+      g.putImageData(id, 0, 0); return c
+    }
+    if (lassoPts && lassoPts.length > 2) {
+      const c = document.createElement('canvas'); c.width = w; c.height = h
+      const g = c.getContext('2d'), kx = L.sx || 1, ky = L.sy || 1
+      g.beginPath(); lassoPts.forEach((p, i) => { const lp = toLocal(L, p.x, p.y); const x = (lp.x - L.x) / kx, y = (lp.y - L.y) / ky; i ? g.lineTo(x, y) : g.moveTo(x, y) }); g.closePath()
+      g.fillStyle = '#000'; g.fill(); return c
+    }
+    return null
+  }
+  // result = original outside the mask, effect inside it.
+  function throughMask(orig, eff, mask) {
+    if (!mask) return eff
+    const w = orig.width, h = orig.height
+    const inside = document.createElement('canvas'); inside.width = w; inside.height = h
+    const gi = inside.getContext('2d'); gi.drawImage(eff, 0, 0, w, h); gi.globalCompositeOperation = 'destination-in'; gi.drawImage(mask, 0, 0, w, h)
+    const out = document.createElement('canvas'); out.width = w; out.height = h
+    const go = out.getContext('2d'); go.drawImage(orig, 0, 0, w, h); go.globalCompositeOperation = 'destination-out'; go.drawImage(mask, 0, 0, w, h)
+    go.globalCompositeOperation = 'source-over'; go.drawImage(inside, 0, 0)
+    return out
+  }
+  function startFxSession(title, stack) {
+    cancelFx()
+    const L = fxTarget(); if (!L) return
+    const mask = selectionMask(L)
+    const prevSrc = reduceForPreview(L.img, 1200)
+    const prevMask = mask && prevSrc.scale < 1 ? (() => { const c = document.createElement('canvas'); c.width = prevSrc.image.width; c.height = prevSrc.image.height; c.getContext('2d').drawImage(mask, 0, 0, c.width, c.height); return c })() : mask
+    const s = fxSession = { L, stack, mask, prevSrc, prevMask, gen: 0, busy: false }
+    const pnl = el('div', 'ie-fxpanel'); pnl.id = 'ie-fxpanel'
+    pnl.appendChild(el('div', 'ie-sec-h', ''))
+    pnl.firstChild.textContent = title
+    pnl.appendChild(el('div', 'ie-fx-note', t(mask ? 'ie_fx_on_sel' : 'ie_fx_on_layer')))
+    if (stack.length === 1) {
+      const item = stack[0], def = resolveFX(item.type)
+      for (const pm of def.params) {
+        const f = el('div', 'ie-field'); f.appendChild(el('label', null, pmLabel(pm)))
+        if (pm.type === 'color') {
+          const ci = el('input'); ci.type = 'color'; ci.value = item.params[pm.id]
+          ci.addEventListener('input', () => { item.params[pm.id] = ci.value; schedule() })
+          f.appendChild(ci)
+        } else {
+          const r = el('input'); r.type = 'range'; r.min = pm.min; r.max = pm.max; r.step = pm.step; r.value = item.params[pm.id]
+          const v = el('span', 'v', Number(r.value).toFixed(pm.step < 1 ? 2 : 0))
+          r.addEventListener('input', () => { item.params[pm.id] = parseFloat(r.value); v.textContent = Number(r.value).toFixed(pm.step < 1 ? 2 : 0); schedule() })
+          f.append(r, v)
+        }
+        pnl.appendChild(f)
+      }
+      if (!def.params.length) pnl.appendChild(el('div', 'ie-fx-note', '—'))
+    } else {
+      for (const it of stack) pnl.appendChild(el('div', 'ie-fx-note', '• ' + fxName(resolveFX(it.type))))
+    }
+    const acts = el('div', 'ie-fx-acts')
+    const ok = el('button', 'ie-btn primary', `<i class="fa-solid fa-check"></i> ${t('ie_apply')}`)
+    const ca = el('button', 'ie-btn', t('ie_crop_cancel'))
+    ok.addEventListener('click', () => applyFx())
+    ca.addEventListener('click', () => cancelFx())
+    acts.append(ok, ca); pnl.appendChild(acts)
+    wrap.appendChild(pnl)
+    s.panel = pnl; s.okBtn = ok
+    let timer = null
+    function schedule() { clearTimeout(timer); timer = setTimeout(previewFx, 90) }
+    schedule()
+  }
+  async function previewFx() {
+    const s = fxSession; if (!s) return
+    const gen = ++s.gen
+    try {
+      const out = await runPipeline(s.prevSrc.image, s.stack, { scale: s.prevSrc.scale })
+      if (fxSession !== s || gen !== s.gen) return
+      s.L._fxPreview = throughMask(s.prevSrc.image, out, s.prevMask)
+      render()
+    } catch { if (fxSession === s) window.toast?.(t('fx_render_fail'), 'error') }
+  }
+  async function applyFx() {
+    const s = fxSession; if (!s || s.busy) return
+    s.busy = true; s.okBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${t('ie_fx_busy')}`
+    try {
+      const out = throughMask(s.L.img, await runPipeline(s.L.img, s.stack), s.mask)
+      if (fxSession !== s) return
+      pushHistory()
+      rasterize(s.L)
+      const c = document.createElement('canvas'); c.width = out.width; c.height = out.height
+      c.getContext('2d', { willReadFrequently: true }).drawImage(out, 0, 0)
+      s.L.img = c
+      fxSession = null; delete s.L._fxPreview; s.panel.remove()
+      if (wandSel && wandSel.L === s.L) clearWand()
+      markDirty(); render(); renderPanel()
+    } catch { if (fxSession === s) { s.busy = false; s.okBtn.innerHTML = `<i class="fa-solid fa-check"></i> ${t('ie_apply')}`; window.toast?.(t('fx_render_fail'), 'error') } }
+  }
+  function cancelFx() {
+    const s = fxSession; if (!s) return
+    fxSession = null
+    delete s.L._fxPreview; s.panel?.remove()
+    render()
+  }
+
+  // ── Image menu: size, rotation, mirror of the whole document ────────────────
+  // A fixed document turns / mirrors / resizes as a page; an infinite one
+  // around the box of its content. Layers keep their own transforms (a quarter
+  // turn adds 90° to each layer); mirroring flips each layer's pixels.
+  function docFrame() {
+    if (!cur) return null
+    if (!cur.infinite && cur.docW) return { x: 0, y: 0, w: cur.docW, h: cur.docH }
+    return layersBounds(cur)
+  }
+  const contentLayers = () => cur.layers.filter(L => L.type !== 'fill' && L.img)
+  function rotateDoc(dir) {
+    const F = docFrame(); if (!F) { window.toast?.(t('ie_no_content'), 'info'); return }
+    cancelFx(); clearLasso(); clearWand()
+    pushHistory()
+    const fixed = !cur.infinite && cur.docW
+    const ox = F.x + F.w / 2, oy = F.y + F.h / 2
+    const nx = fixed ? F.h / 2 : ox, ny = fixed ? F.w / 2 : oy
+    for (const L of contentLayers()) {
+      const w = LW(L), h = LH(L), dx = L.x + w / 2 - ox, dy = L.y + h / 2 - oy
+      const cx = nx + (dir > 0 ? -dy : dy), cy = ny + (dir > 0 ? dx : -dx)
+      L.x = Math.round(cx - w / 2); L.y = Math.round(cy - h / 2)
+      L.rot = ((((L.rot || 0) + 90 * dir) % 360) + 540) % 360 - 180
+    }
+    if (fixed) { const w = cur.docW; cur.docW = cur.docH; cur.docH = w }
+    markDirty(); render(); renderPanel()
+  }
+  function flipLayerPixels(L, horiz) {
+    rasterize(L); ensureCanvasLayer(L)
+    const c = document.createElement('canvas'); c.width = L.img.width; c.height = L.img.height
+    const g = c.getContext('2d', { willReadFrequently: true })
+    if (horiz) { g.translate(c.width, 0); g.scale(-1, 1) } else { g.translate(0, c.height); g.scale(1, -1) }
+    g.drawImage(L.img, 0, 0); L.img = c
+  }
+  function flipDoc(horiz) {
+    const F = docFrame(); if (!F) { window.toast?.(t('ie_no_content'), 'info'); return }
+    cancelFx(); clearLasso(); clearWand()
+    pushHistory()
+    for (const L of contentLayers()) {
+      const w = LW(L), h = LH(L)
+      if (horiz) L.x = Math.round(2 * (F.x + F.w / 2) - (L.x + w / 2) - w / 2)
+      else L.y = Math.round(2 * (F.y + F.h / 2) - (L.y + h / 2) - h / 2)
+      L.rot = -(L.rot || 0)
+      flipLayerPixels(L, horiz)
+    }
+    markDirty(); render(); renderPanel()
+  }
+  function resizeDoc(W2, H2) {
+    const F = docFrame(); if (!F) { window.toast?.(t('ie_no_content'), 'info'); return }
+    cancelFx(); clearLasso(); clearWand()
+    pushHistory()
+    const kx = W2 / F.w, ky = H2 / F.h
+    for (const L of contentLayers()) {
+      L.x = Math.round(F.x + (L.x - F.x) * kx); L.y = Math.round(F.y + (L.y - F.y) * ky)
+      L.sx = (L.sx || 1) * kx; L.sy = (L.sy || 1) * ky
+    }
+    if (!cur.infinite && cur.docW) { cur.docW = W2; cur.docH = H2 }
+    markDirty(); render(); renderPanel()
+  }
+  function promptResize() {
+    const F = docFrame(); if (!F) { window.toast?.(t('ie_no_content'), 'info'); return }
+    wrap.querySelectorAll('.ie-lib-ov').forEach(o => o.remove())
+    const ov = el('div', 'ie-lib-ov'), card = el('div', 'ie-lib-card'); card.style.maxWidth = '300px'
+    card.appendChild(el('div', 'ie-sec-h', t('ie_resize')))
+    const mk = (lab, val) => { const f = el('div', 'ie-field'); f.appendChild(el('label', null, lab)); const i = el('input', 'ie-num'); i.type = 'number'; i.min = 1; i.max = 12000; i.value = val; f.appendChild(i); card.appendChild(f); return i }
+    const wI = mk(t('ie_width'), Math.round(F.w)), hI = mk(t('ie_height'), Math.round(F.h))
+    const kf = el('label'); kf.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);margin:2px 0 6px'
+    const keep = el('input'); keep.type = 'checkbox'; keep.checked = true
+    kf.append(keep, document.createTextNode(t('ie_keep_ratio'))); card.appendChild(kf)
+    const ratio = F.w / F.h
+    wI.addEventListener('input', () => { if (keep.checked) hI.value = Math.max(1, Math.round((+wI.value || 1) / ratio)) })
+    hI.addEventListener('input', () => { if (keep.checked) wI.value = Math.max(1, Math.round((+hI.value || 1) * ratio)) })
+    const pre = el('div'); pre.style.cssText = 'display:flex;gap:5px;margin-bottom:8px'
+    ;[25, 50, 200].forEach(pc => { const b = el('button', 'ie-btn', pc + ' %'); b.addEventListener('click', () => { wI.value = Math.round(F.w * pc / 100); hI.value = Math.round(F.h * pc / 100) }); pre.appendChild(b) })
+    card.appendChild(pre)
+    const acts = el('div'); acts.style.cssText = 'display:flex;gap:6px'
+    const ok = el('button', 'ie-btn', `<i class="fa-solid fa-check"></i> ${t('ie_apply')}`); ok.style.cssText = 'flex:1;justify-content:center'
+    const ca = el('button', 'ie-btn', t('ie_crop_cancel')); ca.style.cssText = 'flex:1;justify-content:center'
+    acts.append(ok, ca); card.appendChild(acts); ov.appendChild(card); wrap.appendChild(ov)
+    const close = () => { ov.remove(); document.removeEventListener('keydown', onKey, true) }
+    const confirm = () => { const W2 = Math.max(1, Math.min(12000, Math.round(+wI.value || 0))), H2 = Math.max(1, Math.min(12000, Math.round(+hI.value || 0))); close(); if (W2 && H2) resizeDoc(W2, H2) }
+    const onKey = e => { if (e.key === 'Enter') { e.preventDefault(); confirm() } else if (e.key === 'Escape') { e.preventDefault(); close() } }
+    document.addEventListener('keydown', onKey, true)
+    ok.addEventListener('click', confirm); ca.addEventListener('click', close)
+    ov.addEventListener('mousedown', e => { if (e.target === ov) close() })
+    wI.focus(); wI.select()
+  }
+
+  // ── Layer reordering with the pointer ────────────────────────────────────────
+  function startLayerDrag(e, row, i) {
+    if (e.button !== 0 || e.target.closest('.act') || e.target.closest('input')) return
+    const y0 = e.clientY
+    let moving = false, target = null
+    const rows = [...panel.querySelectorAll('.ie-layer')]
+    const clear = () => rows.forEach(r => r.classList.remove('drop-above', 'drop-below'))
+    const onMove = ev => {
+      if (!moving && Math.abs(ev.clientY - y0) > 4) { moving = true; row.classList.add('dragging') }
+      if (!moving) return
+      clear(); target = null
+      for (const r of rows) {
+        const rr = r.getBoundingClientRect()
+        if (ev.clientY >= rr.top && ev.clientY < rr.bottom && r !== row) {
+          const above = ev.clientY < rr.top + rr.height / 2
+          r.classList.add(above ? 'drop-above' : 'drop-below')
+          target = { j: +r.dataset.idx, above }
+        }
+      }
+    }
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove); document.removeEventListener('pointerup', onUp)
+      row.classList.remove('dragging'); clear()
+      if (!moving) return
+      // Swallow the click this release produces (it would select a layer) —
+      // only that one: disarmed right after, so a drag that ends outside the
+      // panel (no click) can't eat the next real click.
+      const eat = ev2 => ev2.stopPropagation()
+      document.addEventListener('click', eat, { once: true, capture: true })
+      setTimeout(() => document.removeEventListener('click', eat, { capture: true }), 0)
+      if (!target) return
+      const arr = cur.layers
+      let to = target.j > i ? target.j - 1 : target.j
+      if (target.above) to += 1
+      if (arr[0] && arr[0].type === 'fill') to = Math.max(1, to)   // the background stays at the bottom
+      if (to === i) return
+      pushHistory()
+      const [m] = arr.splice(i, 1)
+      arr.splice(to, 0, m)
+      markDirty(); render(); renderPanel()
+    }
+    document.addEventListener('pointermove', onMove); document.addEventListener('pointerup', onUp)
   }
 
   // ── Library open / export ──────────────────────────────────────────────────
@@ -1683,6 +1989,18 @@ export function initImageEditor(body) {
   body.querySelector('#ie-lib').addEventListener('click', openLibrary)
   body.querySelector('#ie-crop').addEventListener('click', () => { if (regionMode) { endRegion(); render() } else beginRegion('ie_crop_apply', doCrop, true) })
   body.querySelector('#ie-export').addEventListener('click', () => exportDoc(cur))
+  body.querySelector('#ie-docmenu').addEventListener('click', e => {
+    e.stopPropagation()
+    if (!cur || (!cur.docW && !cur.infinite)) return
+    showPop(e.currentTarget, [
+      { icon: 'fa-maximize', label: t('ie_resize'), action: promptResize },
+      { sep: true },
+      { icon: 'fa-rotate-right', label: t('ie_rotate_cw'), action: () => rotateDoc(1) },
+      { icon: 'fa-rotate-left', label: t('ie_rotate_ccw'), action: () => rotateDoc(-1) },
+      { icon: 'fa-left-right', label: t('ie_flip_h'), action: () => flipDoc(true) },
+      { icon: 'fa-up-down', label: t('ie_flip_v'), action: () => flipDoc(false) },
+    ])
+  })
   body.querySelector('#ie-saveproj').addEventListener('click', () => saveProject(cur))
   // "Send to…" — ship the current document (flattened composite) to another tool.
   {
@@ -1730,5 +2048,5 @@ export function initImageEditor(body) {
   window.addEventListener('iceample-theme-changed', render)   // repaint the checker / doc border
   newDoc(); cur = docs[0]; cur.infinite = true; addFill(cur, '#ffffff')   // start with an infinite white file
   render(); renderPanel(); renderTabs()
-  new MutationObserver((_, obs) => { if (!document.contains(body)) { ro.disconnect(); window.removeEventListener('iceample-theme-changed', render); window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', endDrag); document.removeEventListener('keydown', onCopy); document.removeEventListener('keydown', onKeys, true); document.removeEventListener('paste', onPaste); tauriUnlistens.forEach(fn => fn?.()); obs.disconnect() } }).observe(document.body, { childList: true, subtree: true })
+  new MutationObserver((_, obs) => { if (!document.contains(body)) { document.getElementById('ie-pop')?.remove(); ro.disconnect(); window.removeEventListener('iceample-theme-changed', render); window.removeEventListener('pointermove', onPointerMove); window.removeEventListener('pointerup', endDrag); document.removeEventListener('keydown', onCopy); document.removeEventListener('keydown', onKeys, true); document.removeEventListener('paste', onPaste); tauriUnlistens.forEach(fn => fn?.()); obs.disconnect() } }).observe(document.body, { childList: true, subtree: true })
 }

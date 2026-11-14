@@ -3,6 +3,8 @@ import { t } from './i18n.js'
 import { makeSendButton, imageMedia, IMAGE_TARGETS, VIDEO_TARGETS } from './media-bus.js'
 import { promptName } from './rename-dialog.js'
 import { createAudioDriver } from './audio-features.js'
+import { enhanceSidePanel } from './side-panel.js'
+import { registerStoredTool } from './project.js'
 
 export function initParticles(body) {
   body.style.cssText = 'display:flex;flex-direction:column;height:100%;background:var(--surface);font-size:12px;font-family:inherit;'
@@ -474,6 +476,7 @@ export function initParticles(body) {
   panel.style.cssText = 'width:232px;flex-shrink:0;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;border-left:1px solid var(--win-border-in,#1e1e1e);background:var(--surface2,var(--surface));'
 
   main.append(canvasWrap, panel)
+  enhanceSidePanel(panel, { id: 'particles' })
   body.append(topBar, main)
 
   // ── Top bar ────────────────────────────────────────────────────────────────
@@ -1284,4 +1287,8 @@ export function initParticles(body) {
     mo.disconnect()
   })
   mo.observe(document.body, { childList: true, subtree: true })
+
+  // Project / crash recovery: the state stored above is what a project keeps
+  // (see registerStoredTool in project.js).
+  registerStoredTool('particles', { el: body, keys: [STATE_LS], flush: saveState, init: initParticles })
 }

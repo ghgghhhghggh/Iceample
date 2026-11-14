@@ -12,6 +12,8 @@
 //   then markers (zoom / blur / spot), the overlay clips, the titles, and
 //   the music mixed under everything.
 
+import { ffmpegFontFile } from './fonts.js'
+
 // ── Settings ─────────────────────────────────────────────────────────────────
 export const FX_DEFAULT = Object.freeze({
   speed: 1, vol: 1, fadeIn: 0, fadeOut: 0,
@@ -203,7 +205,7 @@ const escapeDrawtext = s => String(s)
   .replace(/[\\%]/g, m => '\\' + m)
   .replace(/[\\':]/g, m => '\\' + m)
   .replace(/[\\'[\],;]/g, m => '\\' + m)
-export function buildDrawtextChain(texts, map, W, H, fontFile) {
+export function buildDrawtextChain(texts, map, W, H) {
   const k = Math.min(W, H) / 720
   return texts.map(tx => {
     let st = map(tx.start), en = map(tx.start + tx.dur)
@@ -212,7 +214,8 @@ export function buildDrawtextChain(texts, map, W, H, fontFile) {
     const x = xh === 'l' ? 'w*0.05' : xh === 'r' ? 'w-text_w-w*0.05' : '(w-text_w)/2'
     const y = yv === 't' ? 'h*0.05' : yv === 'b' ? 'h-text_h-h*0.05' : '(h-text_h)/2'
     const col = '0x' + String(tx.color || '').replace(/[^0-9a-fA-F]/g, '').padEnd(6, 'f').slice(0, 6)
-    let f = `drawtext=fontfile='${fontFile}':text=${escapeDrawtext(tx.text)}` +
+    // One font per title, able to draw its script (Chinese, Japanese, Korean, Arabic…).
+    let f = `drawtext=fontfile='${ffmpegFontFile(tx.text)}':text=${escapeDrawtext(tx.text)}` +
       `:fontsize=${Math.round((TXT_SIZES[tx.size] || 36) * k)}:fontcolor=${col}:x=${x}:y=${y}` +
       `:enable='between(t,${ffTime(st)},${ffTime(en)})'`
     if (tx.band) f += `:box=1:boxcolor=black@0.5:boxborderw=${Math.round(14 * k)}`
@@ -292,7 +295,7 @@ export function planRender({ clips, cfg }) {
 
 /**
  * ffmpeg arguments for the whole montage.
- *  opts: { clips, texts, markers, music, cfg, outPath, fontFile,
+ *  opts: { clips, texts, markers, music, cfg, outPath,
  *          hasAudio(path) → bool, spotFiles: [path] (one per spot marker, in order) }
  * Returns { args, total, W, H } — `total` is the output length in seconds
  * (the progress reference).
@@ -384,7 +387,7 @@ export function buildRenderArgs(plan, opts) {
     }
   })
   // Titles last, above everything.
-  if (texts.length) { g.push(`[${vCur}]${buildDrawtextChain(texts, map, W, H, opts.fontFile)}[vt]`); vCur = 'vt' }
+  if (texts.length) { g.push(`[${vCur}]${buildDrawtextChain(texts, map, W, H)}[vt]`); vCur = 'vt' }
   g.push(`[${vCur}]format=yuv420p[vout]`)
 
   // Music under everything (starts at its timeline position, mapped).

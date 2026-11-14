@@ -1,92 +1,94 @@
 // units.js — Unit converter utility
 import { t } from './i18n.js'
 
-// Each category: { label, units:[{id, label, toBase, fromBase}] }
+// Each category: { label(), units:[{id, label(), toBase, fromBase}] }
 // toBase / fromBase convert to/from a canonical base unit
+// Labels are functions so they are translated at render time (a language switch
+// applies on the next render). Unit symbols stay untranslated.
 const CATEGORIES = [
   {
-    id: 'length', icon: 'fa-ruler-horizontal', label: 'Longueur',
+    id: 'length', icon: 'fa-ruler-horizontal', label: () => t('un_cat_length'),
     base: 'm',
     units: [
-      { id:'km',  label:'Kilomètre (km)',       toBase: v=>v*1000,        fromBase: v=>v/1000 },
-      { id:'m',   label:'Mètre (m)',             toBase: v=>v,             fromBase: v=>v },
-      { id:'cm',  label:'Centimètre (cm)',       toBase: v=>v/100,         fromBase: v=>v*100 },
-      { id:'mm',  label:'Millimètre (mm)',       toBase: v=>v/1000,        fromBase: v=>v*1000 },
-      { id:'mi',  label:'Mile (mi)',             toBase: v=>v*1609.344,    fromBase: v=>v/1609.344 },
-      { id:'yd',  label:'Yard (yd)',             toBase: v=>v*0.9144,      fromBase: v=>v/0.9144 },
-      { id:'ft',  label:'Pied (ft)',             toBase: v=>v*0.3048,      fromBase: v=>v/0.3048 },
-      { id:'in',  label:'Pouce (in)',            toBase: v=>v*0.0254,      fromBase: v=>v/0.0254 },
+      { id:'km',  label:() => `${t('un_kilometre')} (km)`,     toBase: v=>v*1000,        fromBase: v=>v/1000 },
+      { id:'m',   label:() => `${t('un_metre')} (m)`,          toBase: v=>v,             fromBase: v=>v },
+      { id:'cm',  label:() => `${t('un_centimetre')} (cm)`,    toBase: v=>v/100,         fromBase: v=>v*100 },
+      { id:'mm',  label:() => `${t('un_millimetre')} (mm)`,    toBase: v=>v/1000,        fromBase: v=>v*1000 },
+      { id:'mi',  label:() => `${t('un_mile')} (mi)`,          toBase: v=>v*1609.344,    fromBase: v=>v/1609.344 },
+      { id:'yd',  label:() => `${t('un_yard')} (yd)`,          toBase: v=>v*0.9144,      fromBase: v=>v/0.9144 },
+      { id:'ft',  label:() => `${t('un_foot')} (ft)`,          toBase: v=>v*0.3048,      fromBase: v=>v/0.3048 },
+      { id:'in',  label:() => `${t('un_inch')} (in)`,          toBase: v=>v*0.0254,      fromBase: v=>v/0.0254 },
     ]
   },
   {
-    id: 'area', icon: 'fa-vector-square', label: 'Surface',
+    id: 'area', icon: 'fa-vector-square', label: () => t('un_cat_area'),
     base: 'm2',
     units: [
-      { id:'km2', label:'km²',                  toBase: v=>v*1e6,         fromBase: v=>v/1e6 },
-      { id:'m2',  label:'m²',                   toBase: v=>v,             fromBase: v=>v },
-      { id:'cm2', label:'cm²',                  toBase: v=>v/1e4,         fromBase: v=>v*1e4 },
-      { id:'mm2', label:'mm²',                  toBase: v=>v/1e6,         fromBase: v=>v*1e6 },
-      { id:'ha',  label:'Hectare (ha)',          toBase: v=>v*1e4,         fromBase: v=>v/1e4 },
-      { id:'ac',  label:'Acre (ac)',             toBase: v=>v*4046.856,    fromBase: v=>v/4046.856 },
-      { id:'ft2', label:'ft²',                  toBase: v=>v*0.092903,    fromBase: v=>v/0.092903 },
-      { id:'in2', label:'in²',                  toBase: v=>v*0.00064516,  fromBase: v=>v/0.00064516 },
+      { id:'km2', label:() => 'km²',                           toBase: v=>v*1e6,         fromBase: v=>v/1e6 },
+      { id:'m2',  label:() => 'm²',                            toBase: v=>v,             fromBase: v=>v },
+      { id:'cm2', label:() => 'cm²',                           toBase: v=>v/1e4,         fromBase: v=>v*1e4 },
+      { id:'mm2', label:() => 'mm²',                           toBase: v=>v/1e6,         fromBase: v=>v*1e6 },
+      { id:'ha',  label:() => `${t('un_hectare')} (ha)`,       toBase: v=>v*1e4,         fromBase: v=>v/1e4 },
+      { id:'ac',  label:() => `${t('un_acre')} (ac)`,          toBase: v=>v*4046.856,    fromBase: v=>v/4046.856 },
+      { id:'ft2', label:() => 'ft²',                           toBase: v=>v*0.092903,    fromBase: v=>v/0.092903 },
+      { id:'in2', label:() => 'in²',                           toBase: v=>v*0.00064516,  fromBase: v=>v/0.00064516 },
     ]
   },
   {
-    id: 'screen', icon: 'fa-desktop', label: 'Écran/Impression',
+    id: 'screen', icon: 'fa-desktop', label: () => t('un_cat_screen'),
     base: 'px_96',
     units: [
-      { id:'px',  label:'Pixel (px) @96dpi',    toBase: v=>v,             fromBase: v=>v },
-      { id:'pt',  label:'Point (pt)',            toBase: v=>v*96/72,       fromBase: v=>v*72/96 },
-      { id:'pc',  label:'Pica (pc)',             toBase: v=>v*16,          fromBase: v=>v/16 },
-      { id:'cm_s',label:'Centimètre @96dpi',    toBase: v=>v*96/2.54,     fromBase: v=>v*2.54/96 },
-      { id:'mm_s',label:'Millimètre @96dpi',    toBase: v=>v*96/25.4,     fromBase: v=>v*25.4/96 },
-      { id:'in_s',label:'Pouce @96dpi',         toBase: v=>v*96,          fromBase: v=>v/96 },
-      { id:'em',  label:'em (base 16px)',        toBase: v=>v*16,          fromBase: v=>v/16 },
-      { id:'rem', label:'rem (base 16px)',       toBase: v=>v*16,          fromBase: v=>v/16 },
+      { id:'px',  label:() => `${t('un_pixel')} (px) @96dpi`,  toBase: v=>v,             fromBase: v=>v },
+      { id:'pt',  label:() => `${t('un_point')} (pt)`,         toBase: v=>v*96/72,       fromBase: v=>v*72/96 },
+      { id:'pc',  label:() => `${t('un_pica')} (pc)`,          toBase: v=>v*16,          fromBase: v=>v/16 },
+      { id:'cm_s',label:() => `${t('un_centimetre')} @96dpi`,  toBase: v=>v*96/2.54,     fromBase: v=>v*2.54/96 },
+      { id:'mm_s',label:() => `${t('un_millimetre')} @96dpi`,  toBase: v=>v*96/25.4,     fromBase: v=>v*25.4/96 },
+      { id:'in_s',label:() => `${t('un_inch')} @96dpi`,        toBase: v=>v*96,          fromBase: v=>v/96 },
+      { id:'em',  label:() => `em (${t('un_base_16px')})`,     toBase: v=>v*16,          fromBase: v=>v/16 },
+      { id:'rem', label:() => `rem (${t('un_base_16px')})`,    toBase: v=>v*16,          fromBase: v=>v/16 },
     ]
   },
   {
-    id: 'weight', icon: 'fa-weight-hanging', label: 'Masse',
+    id: 'weight', icon: 'fa-weight-hanging', label: () => t('un_cat_weight'),
     base: 'kg',
     units: [
-      { id:'t',   label:'Tonne (t)',             toBase: v=>v*1000,        fromBase: v=>v/1000 },
-      { id:'kg',  label:'Kilogramme (kg)',       toBase: v=>v,             fromBase: v=>v },
-      { id:'g',   label:'Gramme (g)',            toBase: v=>v/1000,        fromBase: v=>v*1000 },
-      { id:'mg',  label:'Milligramme (mg)',      toBase: v=>v/1e6,         fromBase: v=>v*1e6 },
-      { id:'lb',  label:'Livre (lb)',            toBase: v=>v*0.453592,    fromBase: v=>v/0.453592 },
-      { id:'oz',  label:'Once (oz)',             toBase: v=>v*0.0283495,   fromBase: v=>v/0.0283495 },
+      { id:'t',   label:() => `${t('un_tonne')} (t)`,          toBase: v=>v*1000,        fromBase: v=>v/1000 },
+      { id:'kg',  label:() => `${t('un_kilogram')} (kg)`,      toBase: v=>v,             fromBase: v=>v },
+      { id:'g',   label:() => `${t('un_gram')} (g)`,           toBase: v=>v/1000,        fromBase: v=>v*1000 },
+      { id:'mg',  label:() => `${t('un_milligram')} (mg)`,     toBase: v=>v/1e6,         fromBase: v=>v*1e6 },
+      { id:'lb',  label:() => `${t('un_pound')} (lb)`,         toBase: v=>v*0.453592,    fromBase: v=>v/0.453592 },
+      { id:'oz',  label:() => `${t('un_ounce')} (oz)`,         toBase: v=>v*0.0283495,   fromBase: v=>v/0.0283495 },
     ]
   },
   {
-    id: 'temp', icon: 'fa-temperature-half', label: 'Température',
+    id: 'temp', icon: 'fa-temperature-half', label: () => t('un_cat_temp'),
     base: 'k',
     units: [
-      { id:'c',   label:'Celsius (°C)',          toBase: v=>v+273.15,      fromBase: v=>v-273.15 },
-      { id:'f',   label:'Fahrenheit (°F)',       toBase: v=>(v-32)*5/9+273.15, fromBase: v=>(v-273.15)*9/5+32 },
-      { id:'k',   label:'Kelvin (K)',            toBase: v=>v,             fromBase: v=>v },
+      { id:'c',   label:() => `${t('un_celsius')} (°C)`,       toBase: v=>v+273.15,      fromBase: v=>v-273.15 },
+      { id:'f',   label:() => `${t('un_fahrenheit')} (°F)`,    toBase: v=>(v-32)*5/9+273.15, fromBase: v=>(v-273.15)*9/5+32 },
+      { id:'k',   label:() => `${t('un_kelvin')} (K)`,         toBase: v=>v,             fromBase: v=>v },
     ]
   },
   {
-    id: 'storage', icon: 'fa-hard-drive', label: 'Stockage',
+    id: 'storage', icon: 'fa-hard-drive', label: () => t('un_cat_storage'),
     base: 'b',
     units: [
-      { id:'bit', label:'Bit',                   toBase: v=>v,             fromBase: v=>v },
-      { id:'B',   label:'Octet (B)',             toBase: v=>v*8,           fromBase: v=>v/8 },
-      { id:'KB',  label:'Kilooctet (KB)',        toBase: v=>v*8*1024,      fromBase: v=>v/8/1024 },
-      { id:'MB',  label:'Mégaoctet (MB)',        toBase: v=>v*8*1024**2,   fromBase: v=>v/8/1024**2 },
-      { id:'GB',  label:'Gigaoctet (GB)',        toBase: v=>v*8*1024**3,   fromBase: v=>v/8/1024**3 },
-      { id:'TB',  label:'Téraoctet (TB)',        toBase: v=>v*8*1024**4,   fromBase: v=>v/8/1024**4 },
+      { id:'bit', label:() => t('un_bit'),                     toBase: v=>v,             fromBase: v=>v },
+      { id:'B',   label:() => `${t('un_byte')} (B)`,           toBase: v=>v*8,           fromBase: v=>v/8 },
+      { id:'KB',  label:() => `${t('un_kilobyte')} (KB)`,      toBase: v=>v*8*1024,      fromBase: v=>v/8/1024 },
+      { id:'MB',  label:() => `${t('un_megabyte')} (MB)`,      toBase: v=>v*8*1024**2,   fromBase: v=>v/8/1024**2 },
+      { id:'GB',  label:() => `${t('un_gigabyte')} (GB)`,      toBase: v=>v*8*1024**3,   fromBase: v=>v/8/1024**3 },
+      { id:'TB',  label:() => `${t('un_terabyte')} (TB)`,      toBase: v=>v*8*1024**4,   fromBase: v=>v/8/1024**4 },
     ]
   },
   {
-    id: 'speed', icon: 'fa-gauge-high', label: 'Vitesse',
+    id: 'speed', icon: 'fa-gauge-high', label: () => t('un_cat_speed'),
     base: 'ms',
     units: [
-      { id:'ms',  label:'m/s',                  toBase: v=>v,             fromBase: v=>v },
-      { id:'kmh', label:'km/h',                 toBase: v=>v/3.6,         fromBase: v=>v*3.6 },
-      { id:'mph', label:'mph',                  toBase: v=>v*0.44704,     fromBase: v=>v/0.44704 },
-      { id:'kn',  label:'Nœud (kn)',            toBase: v=>v*0.514444,    fromBase: v=>v/0.514444 },
+      { id:'ms',  label:() => 'm/s',                           toBase: v=>v,             fromBase: v=>v },
+      { id:'kmh', label:() => 'km/h',                          toBase: v=>v/3.6,         fromBase: v=>v*3.6 },
+      { id:'mph', label:() => 'mph',                           toBase: v=>v*0.44704,     fromBase: v=>v/0.44704 },
+      { id:'kn',  label:() => `${t('un_knot')} (kn)`,          toBase: v=>v*0.514444,    fromBase: v=>v/0.514444 },
     ]
   },
 ]
@@ -131,7 +133,7 @@ export function initUnits(body) {
     catsEl.innerHTML = ''
     CATEGORIES.forEach(cat => {
       const btn = document.createElement('button'); btn.className = 'u-cat' + (cat.id===activeCat.id?' active':'')
-      btn.innerHTML = `<i class="fa-solid ${cat.icon}"></i> ${cat.label}`
+      btn.innerHTML = `<i class="fa-solid ${cat.icon}"></i> ${cat.label()}`
       btn.addEventListener('click', () => { activeCat = cat; activeFrom = cat.units[0]; renderCats(); renderRows() })
       catsEl.appendChild(btn)
     })
@@ -142,8 +144,8 @@ export function initUnits(body) {
     // "From" selector
     const fromRow = document.createElement('div'); fromRow.style.cssText='display:flex;align-items:center;gap:6px;margin-bottom:4px'
     const fromSel = document.createElement('select'); fromSel.className = 'u-sel'
-    activeCat.units.forEach(u => { const o=document.createElement('option'); o.value=u.id; o.textContent=u.label; if(u.id===activeFrom.id) o.selected=true; fromSel.appendChild(o) })
-    const fromLbl = document.createElement('span'); fromLbl.className = 'u-from-lbl'; fromLbl.textContent='Depuis'
+    activeCat.units.forEach(u => { const o=document.createElement('option'); o.value=u.id; o.textContent=u.label(); if(u.id===activeFrom.id) o.selected=true; fromSel.appendChild(o) })
+    const fromLbl = document.createElement('span'); fromLbl.className = 'u-from-lbl'; fromLbl.textContent=t('un_from')
     fromSel.addEventListener('change', () => { activeFrom=activeCat.units.find(u=>u.id===fromSel.value)||activeCat.units[0]; renderRows() })
     fromRow.append(fromLbl, fromSel)
     bodyEl.appendChild(fromRow)
@@ -155,15 +157,15 @@ export function initUnits(body) {
     const inputs = []
     activeCat.units.forEach(u => {
       const row = document.createElement('div'); row.className='u-row'
-      const lbl = document.createElement('div'); lbl.className='u-lbl'; lbl.textContent=u.label; lbl.title=u.label
+      const lbl = document.createElement('div'); lbl.className='u-lbl'; lbl.textContent=u.label(); lbl.title=lbl.textContent
       const inp = document.createElement('input'); inp.type='number'; inp.className='u-inp'; inp.placeholder='0'
       const cpyBtn = document.createElement('button'); cpyBtn.className='u-copy'; cpyBtn.innerHTML='<i class="fa-solid fa-copy"></i>'
-      cpyBtn.addEventListener('click', () => { navigator.clipboard?.writeText(inp.value || '0'); window.toast?.('Copié', 'success') })
+      cpyBtn.addEventListener('click', () => { navigator.clipboard?.writeText(inp.value || '0'); window.toast?.(t('un_copied'), 'success') })
 
       inp.addEventListener('input', () => {
         const val = parseFloat(inp.value)
         if (isNaN(val)) { inputs.forEach(({inp:i2})=>{if(i2!==inp)i2.value=''}); return }
-        const base = activeFrom.toBase(val)
+        const base = u.toBase(val)   // this row's own unit (it used to read the 'from' unit)
         inputs.forEach(({u:u2, inp:i2}) => {
           if (i2===inp) return
           const res = u2.fromBase(base)

@@ -14,11 +14,12 @@ import { safeInvoke } from './error-utils.js'
 
 // ── Tool registry ─────────────────────────────────────────────────────────────
 const _tools   = {}   // id → { getState, setState, el, rev }
-const _pending = {}   // id → restored state waiting for its tool to be opened
+const _pending = {}   // id → { state, info } waiting for its tool to be opened
 
 /** Register a tool so its state is included in project snapshots.
  *  getState() returns a plain, JSON-serialisable object (or a Promise of one).
- *  setState(state) restores the tool from that object.
+ *  setState(state, info) restores the tool from that object; info.recovery is
+ *      true when the state comes from the crash auto-save (not a project file).
  *  el  (optional) — the tool's body element: once it leaves the DOM the tool is
  *      closed and is skipped by snapshots / restores.
  *  rev (optional) — () => number that changes whenever the state changes; lets
@@ -31,15 +32,54 @@ export function registerTool(id, { getState, setState, el = null, rev = null }) 
   if (id in _pending) {
     // The tool was closed when a snapshot was applied: hand it its state now
     // (deferred, so the tool's own init has finished running).
-    const state = _pending[id]; delete _pending[id]
-    setTimeout(() => _applyOne(id, state), 0)
+    const { state, info } = _pending[id]; delete _pending[id]
+    setTimeout(() => _applyOne(id, state, info), 0)
   }
 }
 
 const _alive = reg => !reg.el || reg.el.isConnected
 
-async function _applyOne(id, state) {
-  try { await _tools[id].setState(state) }
+/** Re-run a tool's init on a fresh body (same element, classes and data
+ *  attributes): the old body leaves the DOM, so its own teardown (the
+ *  "body left the document" observers) stops its loops and listeners. */
+export function remountTool(body, init) {
+  if (!body || !body.isConnected) return null
+  const fresh = body.cloneNode(false)
+  body.replaceWith(fresh)
+  init(fresh)
+  return fresh
+}
+
+/** For tools that keep their state in localStorage and read it back at init
+ *  (animations, patterns, 3D…): the project stores those entries; opening a
+ *  project writes them back and re-initialises the tool. A crash recovery
+ *  re-applies nothing — the stored copy is always the newest — it only gets
+ *  the window reopened.
+ *  opts: { el, keys: [localStorage keys], flush?: () => void (save now), init } */
+export function registerStoredTool(id, { el, keys, flush, init }) {
+  registerTool(id, {
+    el,
+    getState: () => {
+      try { flush?.() } catch {}
+      const stored = {}
+      for (const k of keys) { const v = localStorage.getItem(k); if (v != null) stored[k] = v }
+      return { stored }
+    },
+    setState: (state, info) => {
+      if (!state || typeof state.stored !== 'object' || info?.recovery) return
+      let changed = false
+      for (const k of keys) {
+        const v = state.stored[k]
+        if (typeof v !== 'string' || localStorage.getItem(k) === v) continue
+        try { localStorage.setItem(k, v); changed = true } catch {}
+      }
+      if (changed) remountTool(el, init)
+    },
+  })
+}
+
+async function _applyOne(id, state, info) {
+  try { await _tools[id].setState(state, info || {}) }
   catch (e) { console.warn('[project] setState failed for', id, e) }
 }
 
@@ -196,7 +236,7 @@ export async function resolveRecovery() {
 /** Apply an auto-save recovery snapshot. Returns the ids of the tools that are
  *  not open right now: their state is applied as soon as they are opened. */
 export function applyAutosaveRecovery(snap) {
-  return _applySnapshot(snap)
+  return _applySnapshot(snap, { recovery: true })
 }
 
 // ── Snapshot helpers ──────────────────────────────────────────────────────────
@@ -215,13 +255,13 @@ async function _snapshot(name) {
   }
 }
 
-function _applySnapshot(snap) {
+function _applySnapshot(snap, info = {}) {
   if (!snap || snap.version !== 2) throw new Error('Unsupported project format')
   for (const id of Object.keys(_pending)) delete _pending[id]
   for (const [id, state] of Object.entries(snap.tools || {})) {
     const reg = _tools[id]
-    if (reg && _alive(reg)) _applyOne(id, state)
-    else _pending[id] = state   // applied when that tool is opened
+    if (reg && _alive(reg)) _applyOne(id, state, info)
+    else _pending[id] = { state, info }   // applied when that tool is opened
   }
   clearHistory()
   return Object.keys(_pending)

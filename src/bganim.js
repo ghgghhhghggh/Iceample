@@ -7,6 +7,8 @@ import { setBgConfig } from './bg-spectrum.js'
 import { makeSendButton, imageMedia, VIDEO_TARGETS, IMAGE_TARGETS } from './media-bus.js'
 import { promptName } from './rename-dialog.js'
 import { createAudioDriver } from './audio-features.js'
+import { enhanceSidePanel } from './side-panel.js'
+import { registerStoredTool } from './project.js'
 
 const TAU = Math.PI * 2
 
@@ -1354,4 +1356,10 @@ export function initBgAnim(body) {
       obs.disconnect()
     }
   }).observe(document.body, { childList: true, subtree: true })
+
+  enhanceSidePanel(body.querySelector('.bga-side'), { id: 'bganim' })
+
+  // Project / crash recovery: the state stored above is what a project keeps
+  // (see registerStoredTool in project.js).
+  registerStoredTool('bganim', { el: body, keys: [LS_KEY], flush: saveState, init: initBgAnim })
 }

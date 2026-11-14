@@ -74,7 +74,8 @@ export function initCalc(body) {
     grid.appendChild(btn)
   })
 
-  function display(v) { valEl.textContent = v; exprEl.textContent = expr }
+  // 'Error' stays the internal sentinel; only its on-screen text is translated.
+  function display(v) { valEl.textContent = v === 'Error' ? t('calc_error') : v; exprEl.textContent = expr }
 
   function dispatch(action) {
     if (action === 'clear') { expr = ''; result = '0'; justEvaled = false; opPending = false; display('0'); return }
@@ -127,7 +128,7 @@ export function initCalc(body) {
         justEvaled = true
         opPending = false
         display(result)
-      } catch { result = 'Error'; display('Error') }
+      } catch { result = 'Error'; justEvaled = true; opPending = false; display('Error') }   // next digit starts fresh
       return
     }
   }

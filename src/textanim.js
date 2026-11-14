@@ -5,6 +5,8 @@ import { makeSendButton, imageMedia, VIDEO_TARGETS, IMAGE_TARGETS } from './medi
 import { trackRecentFile } from './recent.js'
 import { promptName } from './rename-dialog.js'
 import { createAudioDriver } from './audio-features.js'
+import { enhanceSidePanel } from './side-panel.js'
+import { registerStoredTool } from './project.js'
 
 const LS_KEY = 'iceample:textanim:cfg'
 const LS_USER = 'iceample:textanim:userpresets'
@@ -1167,4 +1169,10 @@ export function initTextAnim(body) {
 
   resizeCanvas()
   ensureRunning()
+
+  enhanceSidePanel(body.querySelector('.ta-side'), { id: 'textanim' })
+
+  // Project / crash recovery: the state stored above is what a project keeps
+  // (see registerStoredTool in project.js).
+  registerStoredTool('textanim', { el: body, keys: [LS_KEY], flush: saveCfg, init: initTextAnim })
 }

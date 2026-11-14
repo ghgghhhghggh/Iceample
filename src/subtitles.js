@@ -5,6 +5,7 @@ import { t } from './i18n.js'
 import { registerTool } from './project.js'
 import { themeColor } from './theme.js'
 import { mediaUrl } from './media-url.js'
+import { enhanceSidePanel } from './side-panel.js'
 
 let _uid = 0
 function uid() { return ++_uid }
@@ -327,6 +328,7 @@ export function initSubtitles(body) {
   props.appendChild(propsTitle)
 
   middle.append(canvasWrap, props)
+  enhanceSidePanel(props, { id: 'subtitles' })
 
   // Bottom: timeline
   const timelineWrap = document.createElement('div')

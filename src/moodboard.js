@@ -7,12 +7,15 @@ import { showPalPicker } from './palettes.js'
 import { promptName } from './rename-dialog.js'
 import { registerCommands, unregisterCommandsBy } from './commands.js'
 import { themeColor } from './theme.js'
+import { registerTool, remountTool } from './project.js'
 
 const LS_KEY = 'iceample:moodboards'
 const MIN = 40
 let boards = (() => { try { return JSON.parse(localStorage.getItem(LS_KEY)) || [] } catch { return [] } })()
 let _quotaWarnTs = 0
+let _rev = 0   // bumped on every save: lets the auto-save skip unchanged boards
 const persist = () => {
+  _rev++
   try {
     const s = JSON.stringify(boards)
     if (s.length >= 9_000_000) throw new Error('quota')
@@ -666,4 +669,22 @@ export function initMoodboard(body) {
   new MutationObserver((_, obs) => {
     if (!document.contains(body)) { exitBoard(); unregisterCommandsBy(c => c.id.startsWith('moodboard:')); obs.disconnect() }
   }).observe(document.body, { childList: true, subtree: true })
+
+  // Project: the boards travel with it; opening a project merges them in
+  // (same board = replaced, the others are kept). Nothing on crash recovery.
+  registerTool('moodboard', {
+    el: body,
+    rev: () => _rev,
+    getState: () => ({ boards }),
+    setState: (st, info) => {
+      if (info?.recovery || !Array.isArray(st?.boards)) return
+      for (const b of st.boards) {
+        if (!b || !b.id) continue
+        const i = boards.findIndex(x => x.id === b.id)
+        if (i >= 0) boards[i] = b; else boards.push(b)
+      }
+      persist()
+      remountTool(body, initMoodboard)
+    },
+  })
 }

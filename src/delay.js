@@ -1,5 +1,6 @@
 // delay.js — Audio delay / echo effect pedal
 import { getMicStream, makeInputSwitch, routeContext } from './devices.js'
+import { t } from './i18n.js'
 function injectStyles() {
   if (document.getElementById('delay-styles')) return
   const s = document.createElement('style'); s.id = 'delay-styles'
@@ -33,29 +34,29 @@ export function initDelay(body) {
   <div class="dly-echo-bar" id="dly-echo-bar"></div>
   <div class="dly-ctrl">
     <div class="dly-row">
-      <span class="dly-lbl">Délai</span>
+      <span class="dly-lbl">${t('dl_time')}</span>
       <input class="dly-slider" id="dly-time" type="range" min="10" max="1000" step="10" value="250">
       <span class="dly-val" id="dly-time-val">250ms</span>
     </div>
     <div class="dly-row">
-      <span class="dly-lbl">Feedback</span>
+      <span class="dly-lbl">${t('dl_feedback')}</span>
       <input class="dly-slider" id="dly-fb" type="range" min="0" max="95" step="1" value="40">
       <span class="dly-val" id="dly-fb-val">40%</span>
     </div>
     <div class="dly-row">
-      <span class="dly-lbl">Mix</span>
+      <span class="dly-lbl">${t('dl_mix')}</span>
       <input class="dly-slider" id="dly-mix" type="range" min="0" max="100" step="1" value="50">
       <span class="dly-val" id="dly-mix-val">50%</span>
     </div>
     <div class="dly-row">
-      <span class="dly-lbl">Amortissement</span>
+      <span class="dly-lbl">${t('dl_damping')}</span>
       <input class="dly-slider" id="dly-damp" type="range" min="500" max="20000" step="100" value="8000">
       <span class="dly-val" id="dly-damp-val">8kHz</span>
     </div>
   </div>
   <div class="dly-bottom">
-    <button class="dly-on-btn" id="dly-on"><i class="fa-solid fa-microphone"></i> Activer le micro</button>
-    <button class="dly-tap" id="dly-tap" title="Tap tempo">TAP</button>
+    <button class="dly-on-btn" id="dly-on"><i class="fa-solid fa-microphone"></i> ${t('dl_enable_mic')}</button>
+    <button class="dly-tap" id="dly-tap" title="${t('dl_tap_tempo')}">${t('dl_tap')}</button>
   </div>
 </div>`
 
@@ -141,10 +142,10 @@ export function initDelay(body) {
       applyParams()
       isActive = true
       onBtn.classList.add('active')
-      onBtn.innerHTML = '<i class="fa-solid fa-microphone"></i> Actif'
+      onBtn.innerHTML = `<i class="fa-solid fa-microphone"></i> ${t('dl_active')}`
       drawWaveform()
     } catch (e) {
-      window.toast?.('Accès micro refusé', 'error')
+      window.toast?.(t('dl_mic_denied'), 'error')
     }
   }
 
@@ -171,7 +172,7 @@ export function initDelay(body) {
   let tapTimes = []
   tapBtn.addEventListener('click', () => {
     const now = Date.now()
-    tapTimes = tapTimes.filter(t => now - t < 3000)
+    tapTimes = tapTimes.filter(ts => now - ts < 3000)
     tapTimes.push(now)
     if (tapTimes.length >= 2) {
       const intervals = []
@@ -199,7 +200,7 @@ export function initDelay(body) {
       if (rafId) { cancelAnimationFrame(rafId); rafId = null }
       isActive = false
       onBtn.classList.remove('active')
-      onBtn.innerHTML = '<i class="fa-solid fa-microphone"></i> Activer le micro'
+      onBtn.innerHTML = `<i class="fa-solid fa-microphone"></i> ${t('dl_enable_mic')}`
       ctx2d.clearRect(0, 0, canvas.width, canvas.height)
     }
   })

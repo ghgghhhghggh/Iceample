@@ -2646,8 +2646,18 @@ async fn convert_with_libreoffice(
 ) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         std::fs::create_dir_all(&output_dir).map_err(|e| e.to_string())?;
-        let out = std::process::Command::new(&soffice)
-            .args(["--headless", "--convert-to", &format, "--outdir", &output_dir, &input])
+        let mut cmd = std::process::Command::new(&soffice);
+        cmd.arg("--headless");
+        // A PDF opens in Draw by default, which can't save a text document:
+        // to get DOCX / ODT / RTF / TXT out of a PDF, import it with Writer's
+        // PDF filter instead.
+        let target = format.split(':').next().unwrap_or(&format).to_lowercase();
+        let is_pdf = input.to_lowercase().ends_with(".pdf");
+        if is_pdf && ["docx", "doc", "odt", "rtf", "txt"].contains(&target.as_str()) {
+            cmd.arg("--infilter=writer_pdf_import");
+        }
+        let out = cmd
+            .args(["--convert-to", &format, "--outdir", &output_dir, &input])
             .output()
             .map_err(|e| format!("LibreOffice: {}", e))?;
         if !out.status.success() {

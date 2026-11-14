@@ -12,6 +12,8 @@ import { createElasticSlider, asciiCanvas } from './rb-effects.js'
 import { BUILTIN_PRESETS, getUserPresets, addUserPreset, deleteUserPreset, renameUserPreset } from './material-presets.js'
 import { showSendMenu } from './media-bus.js'
 import { themeColor } from './theme.js'
+import { enhanceSidePanel } from './side-panel.js'
+import { registerStoredTool } from './project.js'
 
 const LS_KEY = 'iceample:tool3d'
 const DEF_COLOR = '#8a8f9c'
@@ -1080,4 +1082,10 @@ export async function initTool3D(body) {
       tc.dispose(); orbit.dispose(); renderer.dispose(); obs.disconnect()
     }
   }).observe(document.body, { childList: true, subtree: true })
+
+  enhanceSidePanel(body.querySelector('.t3-insp'), { id: 'tool3d' })
+
+  // Project / crash recovery: the state stored above is what a project keeps
+  // (see registerStoredTool in project.js).
+  registerStoredTool('tool3d', { el: body, keys: [LS_KEY], flush: save, init: initTool3D })
 }

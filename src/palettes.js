@@ -4,6 +4,7 @@
 // meant to be reused across tools (image editor brush, 3D materials, …).
 import { t } from './i18n.js'
 import { promptName } from './rename-dialog.js'
+import { registerTool, remountTool } from './project.js'
 
 const LS = 'iceample:palettes'
 const load = () => { try { return JSON.parse(localStorage.getItem(LS)) } catch { return null } }
@@ -379,4 +380,23 @@ export function initPalettes(body) {
 
   updateContrast()
   render()
+
+  // Project: palettes travel with it; opening a project merges them in (same
+  // name = replaced, the others are kept). Nothing to do on crash recovery.
+  registerTool('palettes', {
+    el: body,
+    getState: () => ({ palettes: load() || [] }),
+    setState: (st, info) => {
+      if (info?.recovery || !Array.isArray(st?.palettes)) return
+      const cur = load() || []
+      for (const p of st.palettes) {
+        if (!p || typeof p.name !== 'string' || !Array.isArray(p.colors)) continue
+        const i = cur.findIndex(x => x.name === p.name)
+        if (i >= 0) cur[i] = p; else cur.push(p)
+      }
+      persistRaw(cur)
+      window.dispatchEvent(new CustomEvent('iceample-palettes-changed'))
+      remountTool(body, initPalettes)
+    },
+  })
 }

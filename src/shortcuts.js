@@ -1,4 +1,5 @@
 // shortcuts.js — Fully customizable keyboard shortcuts for Iceample v2
+import { t } from './i18n.js'
 
 export const DEFAULT_SHORTCUTS = {
   'command-palette':{ key: 'ctrl+k',            label_key: 'sc_command_palette'},
@@ -191,4 +192,40 @@ export function formatBinding(binding) {
     if (p === 'alt')   return 'Alt'
     return p
   }).join(' + ')
+}
+
+// ── Tooltips with the key ────────────────────────────────────────────────────
+// Hovering a button that has a shortcut shows it in the tooltip, e.g.
+// "Play / Pause (Space)" — read live, so a customised key shows up at once.
+// Buttons are matched by id (the tools' transport buttons) or by data-sc.
+const HINTS = [
+  ['#daw-play, #seq-play, #ed-play, #vr-play, #mc-play, #player-play', 'play-pause'],
+  ['#daw-stop, #seq-stop, #ed-stop, #vr-stop, #mc-stop, #player-stop', 'transport-stop'],
+  ['#daw-rec, #mc-rec', 'record'],
+  ['#vr-home', 'go-to-start'],
+  ['#vr-split', 'clip-split'],
+  ['#daw-add-lane, #vr-add, #mc-add', 'new-track'],
+  ['#ie-undo', 'undo'],
+  ['#ie-redo', 'redo'],
+  ['#daw-save-proj, #mc-save, #seq-save', 'save'],
+  ['.tool-win-max', 'win-maximize'],
+]
+const HINT_SEL = HINTS.map(h => h[0]).join(', ') + ', [data-sc]'
+let _hintsOn = false
+export function installShortcutHints() {
+  if (_hintsOn) return
+  _hintsOn = true
+  document.addEventListener('mouseover', e => {
+    const el = e.target.closest?.(HINT_SEL)
+    if (!el) return
+    const action = el.dataset.sc || HINTS.find(h => el.matches(h[0]))?.[1]
+    if (!action) return
+    // The tool may have changed the title since (language, state): take it as the new base.
+    const cur = el.getAttribute('title') || ''
+    if (cur !== el.dataset.scShown) el.dataset.scBase = cur || t(DEFAULT_SHORTCUTS[action]?.label_key || '')
+    const key = getShortcut(action)
+    const shown = key ? `${el.dataset.scBase} (${formatBinding(key)})` : el.dataset.scBase
+    if (shown && shown !== cur) el.setAttribute('title', shown)
+    el.dataset.scShown = shown
+  }, true)
 }

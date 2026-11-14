@@ -15,6 +15,8 @@ import { promptName } from './rename-dialog.js'
 import { makeSendButton, imageMedia } from './media-bus.js'
 import { trackRecentFile } from './recent.js'
 import { renderDesktopOnly } from './desktop-only.js'
+import { enhanceSidePanel } from './side-panel.js'
+import { registerTool } from './project.js'
 
 const RAW_EXTS = ['cr2', 'cr3', 'nef', 'arw', 'raf', 'orf', 'rw2', 'dng', 'srw', 'pef']
 const LIBRAW_KEY = 'iceample:libraw:exe'
@@ -483,4 +485,27 @@ export function initRawTool(body) {
     srcCanvas = null
     obs.disconnect()
   }).observe(document.body, { childList: true, subtree: true })
+
+  enhanceSidePanel(body.querySelector('.rw-panel'), { id: 'rawtool' })
+
+  // Project / crash recovery: which RAW file, and the settings it was developed
+  // with (the preview is re-read; "Develop" stays a deliberate click).
+  const RW_INPUTS = { exp: expInp, wb: wbSel, hl: hlInp, q: qSel, nab: nabInp, b: bInp, c: cInp, s: sInp }
+  registerTool('rawtool', {
+    el: body,
+    getState: () => {
+      const v = {}
+      for (const [k, el] of Object.entries(RW_INPUTS)) if (el) v[k] = el.type === 'checkbox' ? el.checked : el.value
+      return { path: rawPath, name: rawName, v }
+    },
+    setState: st => {
+      if (!st) return
+      for (const [k, el] of Object.entries(RW_INPUTS)) {
+        if (!el || st.v?.[k] === undefined) continue
+        if (el.type === 'checkbox') el.checked = !!st.v[k]; else el.value = st.v[k]
+        el.dispatchEvent(new Event(el.tagName === 'SELECT' || el.type === 'checkbox' ? 'change' : 'input', { bubbles: true }))
+      }
+      if (st.path && st.path !== rawPath) loadRaw(st.path, st.name)
+    },
+  })
 }

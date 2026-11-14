@@ -1,4 +1,5 @@
 // export-canvas.js — Shared PNG / GIF / WebM export panel
+import { t } from './i18n.js'
 
 function injectExportStyles() {
   if (document.getElementById('ec-styles')) return
@@ -170,7 +171,7 @@ async function exportPNG(getCanvas) {
   const dataUrl = tmp.toDataURL('image/png')
   const b64 = dataUrl.split(',')[1]
   const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
-  return saveBinary(bytes, 'export.png', 'png', 'PNG Image')
+  return saveBinary(bytes, t('exc_fname_export') + '.png', 'png', t('exc_filter_png'))
 }
 
 async function exportGIF(getCanvas, durationMs, fps, loop, onProgress, onPlay) {
@@ -181,7 +182,7 @@ async function exportGIF(getCanvas, durationMs, fps, loop, onProgress, onPlay) {
   if (!frames.length) return false
   onProgress?.(0.95)
   const gif = buildGIF(frames, W, H, Math.round(100 / fps), loop)
-  return saveBinary(gif, 'animation.gif', 'gif', 'GIF Animation')
+  return saveBinary(gif, t('exc_fname_animation') + '.gif', 'gif', t('exc_filter_gif'))
 }
 
 // `audio` is a MediaStream, or { stream, release } when the caller must free
@@ -190,14 +191,14 @@ async function exportWebM(getCanvas, durationMs, audio, onProgress, onPlay) {
   const canvas = getCanvas()
   const audioStream = audio instanceof MediaStream ? audio : audio?.stream
   const release = () => {
-    try { audioStream?.getTracks().forEach(t => t.stop()) } catch {}
+    try { audioStream?.getTracks().forEach(tr => tr.stop()) } catch {}
     try { audio?.release?.() } catch {}
   }
   if (!canvas) { release(); return false }
 
   return new Promise(resolve => {
     const stream = canvas.captureStream(30)
-    if (audioStream) audioStream.getAudioTracks().forEach(t => stream.addTrack(t))
+    if (audioStream) audioStream.getAudioTracks().forEach(tr => stream.addTrack(tr))
 
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
       ? 'video/webm;codecs=vp9' : 'video/webm'
@@ -206,13 +207,13 @@ async function exportWebM(getCanvas, durationMs, audio, onProgress, onPlay) {
 
     recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data) }
     recorder.onstop = async () => {
-      stream.getVideoTracks().forEach(t => t.stop())
+      stream.getVideoTracks().forEach(tr => tr.stop())
       release()
       onProgress?.(0.95)
       try {
         const blob = new Blob(chunks, { type: 'video/webm' })
         const buf = await blob.arrayBuffer()
-        resolve(await saveBinary(new Uint8Array(buf), 'animation.webm', 'webm', 'WebM Video'))
+        resolve(await saveBinary(new Uint8Array(buf), t('exc_fname_animation') + '.webm', 'webm', t('exc_filter_webm')))
       } catch (e) { console.error('[export] WebM save failed:', e); resolve(false) }
     }
 
@@ -245,16 +246,16 @@ export function showExportPanel(body, getCanvas, opts = {}) {
 
   overlay.innerHTML = `
 <div class="ec-panel">
-  <div class="ec-title"><i class="fa-solid fa-file-export"></i> Exporter</div>
+  <div class="ec-title"><i class="fa-solid fa-file-export"></i> ${t('exc_export')}</div>
   <div class="ec-tabs">
     <button class="ec-tab sel" data-fmt="png">PNG</button>
-    <button class="ec-tab" data-fmt="gif">GIF animé</button>
+    <button class="ec-tab" data-fmt="gif">${t('exc_tab_gif')}</button>
     <button class="ec-tab" data-fmt="webm">WebM</button>
   </div>
   <div class="ec-fields" id="ec-fields">
-    <div class="ec-note" id="ec-note">Exporte la frame courante en image PNG.</div>
+    <div class="ec-note" id="ec-note">${t('exc_note_png')}</div>
     <div class="ec-row" id="ec-dur-row" style="display:none">
-      <label>Durée</label>
+      <label>${t('exc_duration')}</label>
       <input class="ec-inp" id="ec-dur" type="number" min="0.5" max="30" step="0.5" value="${(getDur()/1000).toFixed(1)}"> s
     </div>
     <div class="ec-row" id="ec-fps-row" style="display:none">
@@ -265,8 +266,8 @@ export function showExportPanel(body, getCanvas, opts = {}) {
   <div class="ec-progress" id="ec-prog"><div class="ec-bar" id="ec-bar"></div></div>
   <div class="ec-status" id="ec-status"></div>
   <div class="ec-actions">
-    <button class="ec-btn" id="ec-cancel">Annuler</button>
-    <button class="ec-btn primary" id="ec-go"><i class="fa-solid fa-download"></i> Exporter</button>
+    <button class="ec-btn" id="ec-cancel">${t('confirm_cancel')}</button>
+    <button class="ec-btn primary" id="ec-go"><i class="fa-solid fa-download"></i> ${t('exc_export')}</button>
   </div>
 </div>`
 
@@ -285,14 +286,14 @@ export function showExportPanel(body, getCanvas, opts = {}) {
   const cancel = overlay.querySelector('#ec-cancel')
 
   const NOTES = {
-    png:  'Exporte la frame courante en image PNG.',
-    gif:  'Enregistre l\'animation complète en GIF (256 couleurs).',
-    webm: 'Enregistre l\'animation en vidéo WebM haute qualité.'
+    png:  t('exc_note_png'),
+    gif:  t('exc_note_gif'),
+    webm: t('exc_note_webm')
   }
 
   tabs.forEach(tab => tab.addEventListener('click', () => {
     fmt = tab.dataset.fmt
-    tabs.forEach(t => t.classList.toggle('sel', t === tab))
+    tabs.forEach(b => b.classList.toggle('sel', b === tab))
     note.textContent = NOTES[fmt]
     durRow.style.display = fmt !== 'png' ? '' : 'none'
     fpsRow.style.display = fmt === 'gif' ? '' : 'none'
@@ -308,7 +309,7 @@ export function showExportPanel(body, getCanvas, opts = {}) {
 
   goBtn.addEventListener('click', async () => {
     goBtn.disabled = true; cancel.disabled = true
-    status.textContent = 'Enregistrement…'
+    status.textContent = t('exc_recording')
     const dur = parseFloat(durInp.value) * 1000 || getDur()
     const fps = parseInt(fpsInp.value) || 15
     const loop = getLoop()
@@ -324,16 +325,17 @@ export function showExportPanel(body, getCanvas, opts = {}) {
         ok = await exportWebM(getCanvas, dur, audioStream, setProgress, opts.onPlay)
       }
       if (ok) {
-        status.textContent = '✓ Fichier sauvegardé'
+        status.textContent = '✓ ' + t('exc_saved')
         setTimeout(() => overlay.remove(), 1200)
       } else {
-        status.textContent = 'Annulé.'
+        status.textContent = t('exc_cancelled')
         goBtn.disabled = false; cancel.disabled = false
         prog.style.display = 'none'
       }
     } catch (e) {
-      status.textContent = 'Erreur : ' + (e?.message ?? e)
+      status.textContent = t('exc_error') + ' ' + (e?.message ?? e)
       goBtn.disabled = false; cancel.disabled = false
+      prog.style.display = 'none'
     }
   })
 }

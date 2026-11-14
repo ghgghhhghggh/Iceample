@@ -11,6 +11,7 @@ import { promptName, confirmUnsaved } from './rename-dialog.js'
 import { trackRecentFile } from './recent.js'
 import { sendMedia } from './media-bus.js'
 import { mediaUrl, mediaUrlSync } from './media-url.js'
+import { cssFontFor } from './fonts.js'
 import { registerTool } from './project.js'
 import { routeMedia } from './devices.js'
 import { fxOf, fxDiff, cfgOf, ASPECTS, RESOLUTIONS, FPS_LIST, SPEEDS, exportSize, cropWindow, planRender, buildRenderArgs } from './videorec-render.js'
@@ -62,7 +63,7 @@ function injectVrStyles() {
 .vr-txt-prev { position:absolute; max-width:90%; line-height:1.25; font-family:Arial, sans-serif; white-space:pre-wrap; }
 .vr-clip.vr-ph { background:repeating-linear-gradient(45deg, color-mix(in srgb, var(--text-secondary) 13%, transparent) 0 8px, color-mix(in srgb, var(--surface2) 60%, transparent) 8px 16px) !important; border:1.5px dashed color-mix(in srgb, var(--text-secondary) 55%, transparent) !important; }
 .vr-ph-dur { margin-left:auto; flex-shrink:0; font-size:9px; color:var(--text-secondary); background:color-mix(in srgb, var(--bg) 55%, transparent); border-radius:3px; padding:1px 4px; font-variant-numeric:tabular-nums; }
-.vr-pos-grid { display:grid; grid-template-columns:repeat(3, 18px); grid-auto-rows:18px; gap:3px; }
+.vr-pos-grid { direction:ltr; display:grid; grid-template-columns:repeat(3, 18px); grid-auto-rows:18px; gap:3px; }
 .vr-pos-cell { border:1px solid var(--win-border-in); border-radius:3px; background:var(--surface); cursor:pointer; padding:0; }
 .vr-pos-cell.on { background:color-mix(in srgb, var(--color-active) 45%, var(--surface)); border-color:var(--color-active); }
 .vr-mk-lane { position:relative; height:18px; border-bottom:1px solid var(--win-border-in); background:color-mix(in srgb, var(--vu-color-high) 4%, transparent); }
@@ -1271,6 +1272,7 @@ export function initVideoRec(body) {
     for (const tx of act) {
       const d = document.createElement('div'); d.className = 'vr-txt-prev'
       d.textContent = tx.text
+      d.style.fontFamily = cssFontFor(tx.text)   // the font the export will use for this script
       d.style.fontSize = ((TXT_SIZES[tx.size] || 36) * scale) + 'px'
       d.style.color = tx.color || '#ffffff'   // user-picked content color — literal on purpose
       if (tx.band) { d.style.background = 'rgba(0,0,0,.5)'; d.style.padding = (14 * scale) + 'px' }   // mirrors black@0.5 + boxborderw=14
@@ -2457,7 +2459,6 @@ export function initVideoRec(body) {
       }
       const { args, total } = buildRenderArgs(plan, {
         clips: real, texts, markers, music, outPath, spotFiles,
-        fontFile: 'C\\:/Windows/Fonts/arial.ttf',
         hasAudio: p => !!sound.get(p),
       })
       const r = await ffJob(args, total, t('vr_job_export'))

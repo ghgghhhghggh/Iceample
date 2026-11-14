@@ -9,7 +9,7 @@ import { maybeShowOnboarding } from './onboarding.js'
 import { autoSaveLayout, getFullLayout } from './layout.js'
 import { t, applyTranslations } from './i18n.js'
 import { initBgSpectrum } from './bg-spectrum.js'
-import { matchesShortcut } from './shortcuts.js'
+import { matchesShortcut, installShortcutHints } from './shortcuts.js'
 import { registerCommands } from './commands.js'
 import { openCommandPalette } from './command-palette.js'
 import { undo, redo, canUndo, canRedo } from './history.js'
@@ -561,6 +561,7 @@ window.addEventListener('DOMContentLoaded', () => {
   // ── MIDI bus ───────────────────────────────────────────────────────────────
   initMidiBus()
   initDevices()
+  installShortcutHints()   // tooltips of transport / undo / save buttons show their key
 
   // ── Quick dock ────────────────────────────────────────────────────────────
   const dock = document.createElement('div')
