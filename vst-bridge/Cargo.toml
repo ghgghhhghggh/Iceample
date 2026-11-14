@@ -1,6 +1,6 @@
 [package]
 name = "iceample-vst-bridge"
-version = "2.2.0"
+version = "2.3.0"
 description = "Iceample 32-bit out-of-process VST host bridge"
 authors = ["Kyliann Chapel"]
 edition = "2021"
