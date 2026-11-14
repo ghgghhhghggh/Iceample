@@ -45,7 +45,7 @@ export const EXTRA_TOOLS = [
   // 'videorec' absorbed the old standalone cutter: it IS the video editor now
   // (timeline + ffmpeg actions), labeled "Montage vidéo". Recording moved out
   // to the dedicated 'recorder' tool.
-  { id: 'videorec',   labelKey: 'tool_videocut',  icon: 'fa-solid fa-clapperboard',        w: 960, h: 620, domain: 'video' },
+  { id: 'videorec',   labelKey: 'tool_videocut',  icon: 'fa-solid fa-clapperboard',        w: 960, h: 700, domain: 'video' },
   { id: 'recorder',   labelKey: 'tool_recorder',  icon: 'fa-solid fa-record-vinyl',        w: 540, h: 470, domain: 'video' },
   { id: 'timelapse',  labelKey: 'tool_timelapse', icon: 'fa-solid fa-hourglass-half',      w: 620, h: 520, domain: 'video' },
   { id: 'rawtool',    labelKey: 'tool_rawtool',   icon: 'fa-solid fa-camera-retro',        w: 780, h: 560, domain: 'image' },

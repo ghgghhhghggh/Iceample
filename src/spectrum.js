@@ -1,4 +1,5 @@
-import { createPrivateAnalyser, createMasterTap, getCtx } from './audio-bus.js'
+import { createPrivateAnalyser, createMasterTap, getCtx, getTrackNode } from './audio-bus.js'
+import { loadAudioFile } from './audio-features.js'
 import { createBeatDetector } from './beat-detector.js'
 import { t } from './i18n.js'
 import { showExportPanel } from './export-canvas.js'
@@ -55,6 +56,28 @@ function injectStyles() {
   scrollbar-width: thin; scrollbar-color: var(--win-border) transparent;
 }
 .sp-panel.hidden { display: none; }
+/* Player of a sound file sent to the spectrum (plays through the app's mix) */
+.sp-player {
+  position: absolute; left: 8px; bottom: 8px; width: min(300px, calc(100% - 16px));
+  display: flex; align-items: center; gap: 6px; padding: 4px 6px;
+  border-radius: 8px; z-index: 10; backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--surface2) 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 14%, transparent);
+  color: var(--text-primary); font-size: 11px;
+}
+.sp-player.hidden { display: none; }
+.sp-pl-btn {
+  width: 22px; height: 22px; flex-shrink: 0; border: none; border-radius: 5px;
+  background: transparent; color: var(--text-secondary); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 11px;
+}
+.sp-pl-btn:hover { color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 8%, transparent); }
+.sp-pl-name { flex: 0 1 auto; max-width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-pl-time { flex-shrink: 0; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.sp-pl-bar { flex: 1; min-width: 40px; height: 14px; position: relative; cursor: pointer; }
+.sp-pl-bar::before, .sp-pl-fill { content: ''; position: absolute; left: 0; top: 5px; height: 4px; border-radius: 2px; }
+.sp-pl-bar::before { right: 0; background: color-mix(in srgb, var(--text-primary) 16%, transparent); }
+.sp-pl-fill { width: 0; background: var(--accent); }
 .sp-section-hdr {
   font-size: 9.5px; font-weight: 700; letter-spacing: 0.14em;
   /* same light blue as before on dark themes, darker blue on light ones */
@@ -1488,6 +1511,87 @@ export function initSpectrum(body) {
 
   buildPanel(wrap, cs, analyser)
 
+  // ── Sound file player ──────────────────────────────────────────────────────
+  // A sound sent here ("Open with…", "Send to…") plays through the app's mix
+  // (its own track, so the mixer and the master chain apply), and every
+  // visualiser reacts to it like to any other sound of the app.
+  const player = document.createElement('div')
+  player.className = 'sp-player hidden'
+  player.innerHTML = '<button class="sp-pl-btn" data-act="play"><i class="fa-solid fa-play"></i></button>'
+    + '<span class="sp-pl-name"></span><div class="sp-pl-bar"><div class="sp-pl-fill"></div></div>'
+    + '<span class="sp-pl-time"></span><button class="sp-pl-btn" data-act="close"><i class="fa-solid fa-xmark"></i></button>'
+  wrap.appendChild(player)
+  const plPlay = player.querySelector('[data-act="play"]')
+  const plClose = player.querySelector('[data-act="close"]')
+  const plName = player.querySelector('.sp-pl-name')
+  const plBar = player.querySelector('.sp-pl-bar')
+  const plFill = player.querySelector('.sp-pl-fill')
+  const plTime = player.querySelector('.sp-pl-time')
+  plPlay.title = t('sc_play_pause'); plClose.title = t('audio_clear')
+  let plBuf = null, plSrc = null, plStartedAt = 0, plOffset = 0, plRaf = 0, plToken = 0
+  const fmt = s => { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') }
+  const plPos = () => plSrc ? Math.min(plBuf.duration, plOffset + getCtx().currentTime - plStartedAt) : plOffset
+  function plUi() {
+    plPlay.innerHTML = `<i class="fa-solid fa-${plSrc ? 'pause' : 'play'}"></i>`
+    const pos = plBuf ? plPos() : 0, dur = plBuf ? plBuf.duration : 0
+    plFill.style.width = dur ? (pos / dur * 100) + '%' : '0'
+    plTime.textContent = dur ? fmt(pos) + ' / ' + fmt(dur) : ''
+  }
+  function plTick() { plUi(); plRaf = plSrc ? requestAnimationFrame(plTick) : 0 }
+  function plStop(keepPos) {
+    if (plSrc) {
+      const pos = plPos()
+      plSrc.onended = null
+      try { plSrc.stop() } catch {}
+      plSrc.disconnect(); plSrc = null
+      plOffset = keepPos ? pos : 0
+    } else if (!keepPos) plOffset = 0
+    cancelAnimationFrame(plRaf); plRaf = 0
+    plUi()
+  }
+  function plStart() {
+    if (!plBuf) return
+    const ctx = getCtx()
+    if (plOffset >= plBuf.duration - 0.02) plOffset = 0
+    plSrc = ctx.createBufferSource()
+    plSrc.buffer = plBuf
+    plSrc.connect(getTrackNode('spectrum'))
+    plSrc.onended = () => { plSrc = null; plOffset = 0; cancelAnimationFrame(plRaf); plRaf = 0; plUi() }
+    plStartedAt = ctx.currentTime
+    plSrc.start(0, plOffset)
+    plTick()
+  }
+  function plClear() { plToken++; plStop(false); plBuf = null; player.classList.add('hidden') }
+  plPlay.addEventListener('click', () => { if (plSrc) plStop(true); else plStart() })
+  plClose.addEventListener('click', plClear)
+  plBar.addEventListener('mousedown', e => {
+    const r = plBar.getBoundingClientRect()
+    if (!plBuf || r.width <= 0) return
+    const wasPlaying = !!plSrc
+    plStop(false)
+    plOffset = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * plBuf.duration
+    if (wasPlaying) plStart(); else plUi()
+  })
+  body.addEventListener('iceample-media', async e => {
+    const m = e.detail
+    if (!m || m.kind !== 'audio' || !m.path) return
+    const token = ++plToken
+    plStop(false); plBuf = null
+    plName.textContent = m.name || String(m.path).split(/[\\/]/).pop()
+    plName.title = plName.textContent
+    player.classList.remove('hidden'); plUi()
+    try {
+      const { buffer } = await loadAudioFile(m.path)
+      if (token !== plToken || !document.contains(body)) return
+      plBuf = buffer; plOffset = 0
+      plStart()
+    } catch {
+      if (token !== plToken) return
+      plClear()
+      window.toast?.(t('audio_failed'), 'error')
+    }
+  })
+
   // ── Export button ──────────────────────────────────────────────────────────
   const spExportBtn = document.createElement('button')
   spExportBtn.className = 'sp-palette-btn'
@@ -1883,7 +1987,7 @@ export function initSpectrum(body) {
 
   const obs = new MutationObserver(() => {
     if (!document.contains(body)) {
-      cancelAnimationFrame(raf); ro.disconnect(); obs.disconnect(); beat.stop(); analyser.release()
+      cancelAnimationFrame(raf); ro.disconnect(); obs.disconnect(); beat.stop(); analyser.release(); plClear()
       ;[sceneFBO, bloomA, bloomB].forEach(f => { if (f) { gl.deleteFramebuffer(f.fb); gl.deleteTexture(f.tex) } })
     }
   })

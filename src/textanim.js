@@ -4,6 +4,7 @@ import { t } from './i18n.js'
 import { makeSendButton, imageMedia, VIDEO_TARGETS, IMAGE_TARGETS } from './media-bus.js'
 import { trackRecentFile } from './recent.js'
 import { promptName } from './rename-dialog.js'
+import { createAudioDriver } from './audio-features.js'
 
 const LS_KEY = 'iceample:textanim:cfg'
 const LS_USER = 'iceample:textanim:userpresets'
@@ -49,6 +50,9 @@ function injectStyles() {
 .ta-chip:hover{color:var(--text-primary);border-color:var(--win-border)}
 .ta-chip.on{border-color:var(--color-active);background:color-mix(in srgb,var(--color-active) 15%,transparent);color:var(--color-active)}
 .ta-actions{display:flex;gap:6px}
+.ta-audio-row .ta-btn:first-child{flex:1}.ta-audio-row .ta-ic{flex:0 0 32px;padding:7px 0}
+.ta-ic.on{border-color:var(--color-active);color:var(--color-active)}
+.ta-audio-name{font-size:11px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:14px}
 .ta-actions>*{flex:1}
 .ta-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 8px;border:1px solid var(--win-border-in);border-radius:7px;background:color-mix(in srgb,var(--text-primary) 6%,var(--surface));color:var(--text-secondary);font-size:11px;cursor:pointer;font-family:inherit;transition:all .12s;white-space:nowrap}
 .ta-btn:hover{background:color-mix(in srgb,var(--text-primary) 12%,var(--surface));color:var(--text-primary)}
@@ -445,6 +449,17 @@ export function initTextAnim(body) {
     <div class="ta-actions">
       <button class="ta-btn primary" id="ta-replay"><i class="fa-solid fa-rotate-left"></i> <span></span></button>
     </div>
+    <div class="ta-sec">${t('audio_section')}</div>
+    <div class="ta-actions ta-audio-row">
+      <button class="ta-btn" id="ta-audio-pick"><i class="fa-solid fa-music"></i> <span>${t('audio_pick')}</span></button>
+      <button class="ta-btn ta-ic" id="ta-audio-mix" title="${t('audio_mix')}"><i class="fa-solid fa-sliders"></i></button>
+      <button class="ta-btn ta-ic" id="ta-audio-clear" title="${t('audio_clear')}"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="ta-audio-name" id="ta-audio-name"></div>
+    <div class="ta-grid">
+      <label>${t('audio_react')}</label>
+      <div class="ta-slidewrap"><input id="ta-react" type="range" min="0" max="1" step="0.05"><span class="ta-sval" id="ta-react-val"></span></div>
+    </div>
     <div class="ta-sec" id="ta-l-export"></div>
     <div class="ta-actions">
       <button class="ta-btn" id="ta-png"><i class="fa-solid fa-image"></i> <span></span></button>
@@ -472,6 +487,15 @@ export function initTextAnim(body) {
   const pngBtn    = body.querySelector('#ta-png')
   const webmBtn   = body.querySelector('#ta-webm')
   const sendRow   = body.querySelector('#ta-send-row')
+  const audioPickBtn  = body.querySelector('#ta-audio-pick')
+  const audioMixBtn   = body.querySelector('#ta-audio-mix')
+  const audioClearBtn = body.querySelector('#ta-audio-clear')
+  const audioNameEl   = body.querySelector('#ta-audio-name')
+  const reactInp      = body.querySelector('#ta-react')
+  const reactVal      = body.querySelector('#ta-react-val')
+  const audio = createAudioDriver()
+  let fx = null          // the sound's values for the current frame (null = no sound)
+  let recSound = false   // recording the whole sound (not one loop)
 
   // labels
   body.querySelector('label[for="ta-text"]').textContent = t('ta_text')
@@ -615,10 +639,16 @@ export function initTextAnim(body) {
       ctx.scale(lay.scale, lay.scale)
       ctx.translate(-W / 2, -H / 2)
     }
+    if (fx) {
+      const k = 1 + parseFloat(reactInp.value) * (fx.bass * 0.1 + fx.beat * 0.08)
+      ctx.translate(W / 2, H / 2)
+      ctx.scale(k, k)
+      ctx.translate(-W / 2, -H / 2)
+    }
     ctx.font = fontStr(o)
     ctx.textAlign = 'left'
     ctx.textBaseline = 'middle'
-    PRESET_MAP[cur].draw({ ctx, W, H, o, lay, q, p: clamp01(q / ENTER_END), t: phaseMs, dpr, scratch: getScratch })
+    PRESET_MAP[cur].draw({ ctx, W, H, o, lay, q, p: clamp01(q / ENTER_END), t: phaseMs, dpr, scratch: getScratch, audio: fx })
     ctx.restore()
   }
 
@@ -630,16 +660,19 @@ export function initTextAnim(body) {
     if (document.hidden) { lastTs = null; return }   // resumed by visibilitychange
     const dt = lastTs == null ? 16.7 : Math.min(100, ts - lastTs)
     lastTs = ts
-    phaseMs += dt
+    fx = audio.features()
+    phaseMs += dt * (fx ? 1 + parseFloat(reactInp.value) * fx.level * 0.8 : 1)
     const D = cycleMs()
+    const sounding = audio.mode !== 'off'
     let q, more
-    if (recorder) { q = Math.min(1, phaseMs / D); more = true }
+    if (recorder && !recSound) { q = Math.min(1, phaseMs / D); more = true }
     else if (loop) { q = (phaseMs % D) / D; more = true }
-    else if (phaseMs >= D) { q = 1; more = false }
+    else if (phaseMs >= D) { q = 1; more = sounding }   // keep pulsing with the sound
     else { q = phaseMs / D; more = true }
     if (loop && !recorder && phaseMs > 1e7) phaseMs %= D
     renderFrame(q)
-    if (recorder && recorder.state === 'recording' && phaseMs >= D) recorder.stop()
+    // A one-loop capture stops after one cycle; a sound capture when the sound ends.
+    if (recorder && !recSound && recorder.state === 'recording' && phaseMs >= D) recorder.stop()
     if (more) rafId = requestAnimationFrame(frame)
   }
 
@@ -648,7 +681,7 @@ export function initTextAnim(body) {
   }
 
   function replay() {
-    if (!recorder) { phaseMs = 0; lastTs = null }
+    if (!recorder) { phaseMs = 0; lastTs = null; if (audio.mode === 'file') { audio.seek(0); audio.play() } }
     ensureRunning()
   }
 
@@ -664,7 +697,8 @@ export function initTextAnim(body) {
         preset: cur, text: textInp.value, size: parseInt(sizeInp.value, 10) || 64,
         font: fontSel.value, fontPath: customFontPath, userPreset: curUser,
         color: colorInp.value, accent: accentInp.value,
-        bg: bgInp.value, transparent, speed: parseFloat(speedInp.value) || 1, loop
+        bg: bgInp.value, transparent, speed: parseFloat(speedInp.value) || 1, loop,
+        react: parseFloat(reactInp.value)
       }))
     } catch {}
   }
@@ -965,6 +999,47 @@ export function initTextAnim(body) {
     })
   }
 
+  // With a sound file: the whole sound, sound included (starts at the beginning,
+  // stops when the sound ends; the text follows it live as on screen).
+  function recordWithSound() {
+    return new Promise(resolve => {
+      if (recorder) { window.toast?.(t('ta_rec_busy'), 'info'); resolve(null); return }
+      if (typeof MediaRecorder === 'undefined' || !canvas.captureStream || !audio.element) {
+        window.toast?.(t('ta_webm_unsupported'), 'error'); resolve(null); return
+      }
+      const el = audio.element
+      const stream = canvas.captureStream(60)
+      const track = audio.audioTrack()
+      if (track) stream.addTrack(track)
+      const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(m => MediaRecorder.isTypeSupported?.(m)) || 'video/webm'
+      let rec
+      try { rec = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8e6 }) }
+      catch { stream.getTracks().forEach(tr => tr.stop()); window.toast?.(t('ta_webm_unsupported'), 'error'); resolve(null); return }
+      const chunks = []
+      const wasLoop = el.loop
+      const onEnded = () => { try { if (rec.state !== 'inactive') rec.stop() } catch {} }
+      const release = () => {
+        recorder = null; recSound = false
+        el.removeEventListener('ended', onEnded); el.loop = wasLoop
+        stream.getTracks().forEach(tr => tr.stop())
+        if (wasLoop) audio.play()
+      }
+      rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data) }
+      rec.onstop = () => { release(); resolve(new Blob(chunks, { type: 'video/webm' })) }
+      rec.onerror = () => { release(); window.toast?.(t('ta_export_fail'), 'error'); resolve(null) }
+      recorder = rec; recSound = true
+      el.loop = false
+      el.addEventListener('ended', onEnded)
+      audio.seek(0)
+      phaseMs = 0; lastTs = null
+      window.toast?.(t('ta_recording'), 'info', Math.min(6000, audio.duration * 1000))
+      try { rec.start(100); audio.play() }
+      catch { release(); window.toast?.(t('ta_export_fail'), 'error'); resolve(null); return }
+      ensureRunning()
+    })
+  }
+  const recordVideo = () => audio.mode === 'file' ? recordWithSound() : recordLoop()
+
   // ── Export buttons ──────────────────────────────────────────────────────────
   pngBtn.addEventListener('click', () => {
     canvas.toBlob(async blob => {
@@ -977,9 +1052,9 @@ export function initTextAnim(body) {
   webmBtn.addEventListener('click', async () => {
     webmBtn.disabled = true
     try {
-      const blob = await recordLoop()
+      const blob = await recordVideo()
       if (blob) {
-        if (await saveBlob(blob, 'textanim.webm', 'webm', 'WebM Video')) window.toast?.(t('ta_saved'), 'success')
+        if (await saveBlob(blob, audio.mode === 'file' ? 'textanim-son.webm' : 'textanim.webm', 'webm', 'WebM Video')) window.toast?.(t('ta_saved'), 'success')
       }
     } catch { window.toast?.(t('ta_export_fail'), 'error') }
     webmBtn.disabled = false
@@ -989,7 +1064,7 @@ export function initTextAnim(body) {
   // Video: record one loop lazily on pick, hand over a blob URL (never revoked
   // here — the receiver side owns playback and the bus contract forbids it).
   const sendVid = makeSendButton(async () => {
-    const blob = await recordLoop()
+    const blob = await recordVideo()
     if (!blob) return null
     return { kind: 'video', blobUrl: URL.createObjectURL(blob), name: 'textanim.webm' }
   }, { self: 'textanim', targets: VIDEO_TARGETS, className: 'ta-btn' })
@@ -1017,7 +1092,57 @@ export function initTextAnim(body) {
   const ro = new ResizeObserver(resizeCanvas)
   ro.observe(previewEl)
 
-  const onVis = () => { if (!document.hidden) ensureRunning() }
+  // ── Sound: the text follows a sound file or the app's mix ──────────────────
+  reactInp.value = String(Number.isFinite(cfg.react) ? cfg.react : 0.6)
+  reactVal.textContent = Math.round(parseFloat(reactInp.value) * 100) + '%'
+  reactInp.addEventListener('input', () => {
+    reactVal.textContent = Math.round(parseFloat(reactInp.value) * 100) + '%'
+    saveCfg()
+  })
+  function refreshAudioUi() {
+    audioNameEl.textContent = audio.mode === 'file' ? audio.name : audio.mode === 'mix' ? t('audio_mix') : t('audio_none')
+    audioMixBtn.classList.toggle('on', audio.mode === 'mix')
+    audioClearBtn.disabled = audio.mode === 'off'
+  }
+  async function loadSound(path, name) {
+    audioNameEl.textContent = t('audio_analysing')
+    try {
+      await audio.loadFile(path, name)
+      audio.element.loop = true
+      phaseMs = 0; lastTs = null
+      audio.play()
+      ensureRunning()
+    } catch { window.toast?.(t('audio_failed'), 'error') }
+    refreshAudioUi()
+  }
+  audioPickBtn.addEventListener('click', async () => {
+    if (recorder) return
+    try {
+      const f = await window.__TAURI__.core.invoke('pick_audio_file')
+      if (f?.path) loadSound(f.path, f.name)
+    } catch {}
+  })
+  audioMixBtn.addEventListener('click', () => {
+    if (recorder) return
+    if (audio.mode === 'mix') audio.clear(); else audio.useMix()
+    refreshAudioUi(); ensureRunning()
+  })
+  audioClearBtn.addEventListener('click', () => {
+    if (recorder) return
+    audio.clear(); fx = null
+    refreshAudioUi(); poke()
+  })
+  // "Open with…" from the Library / Search / Recents, or a sound sent by another tool.
+  body.addEventListener('iceample-media', e => {
+    const m = e.detail
+    if (m && m.kind === 'audio' && m.path) loadSound(m.path, m.name)
+  })
+  refreshAudioUi()
+
+  const onVis = () => {
+    if (!document.hidden) { ensureRunning(); if (audio.mode === 'file' && audio.element?.loop) audio.play() }
+    else if (!recorder) audio.pause()
+  }
   document.addEventListener('visibilitychange', onVis)
 
   function teardown() {
@@ -1026,6 +1151,7 @@ export function initTextAnim(body) {
     if (rafId != null) cancelAnimationFrame(rafId)
     rafId = null
     try { if (recorder && recorder.state !== 'inactive') recorder.stop() } catch {}
+    audio.dispose()
     document.getElementById('ta-user-menu')?.remove()   // menu lives on document.body
     document.removeEventListener('visibilitychange', onVis)
     ro.disconnect()

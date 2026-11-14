@@ -4,6 +4,7 @@ import { trackRecentFile } from './recent.js'
 import { t } from './i18n.js'
 import { registerTool } from './project.js'
 import { themeColor } from './theme.js'
+import { mediaUrl } from './media-url.js'
 
 let _uid = 0
 function uid() { return ++_uid }
@@ -393,13 +394,14 @@ export function initSubtitles(body) {
       try { bgVideo.currentTime = target } catch {}
     }
   }
-  body.addEventListener('iceample-media', e => {
+  body.addEventListener('iceample-media', async e => {
     const m = e.detail
     if (!m || m.kind !== 'video') return
-    const src = m.blobUrl || (m.path ? 'file://' + String(m.path).replace(/\\/g, '/') : null)
+    let src = m.blobUrl || null
+    if (m.path) { try { src = await mediaUrl(m.path) } catch { src = null } }
     if (!src) return
     const v = document.createElement('video')
-    v.muted = true; v.preload = 'auto'
+    v.muted = true; v.preload = 'auto'; v.crossOrigin = 'anonymous'   // frames go on the export canvas
     v.addEventListener('loadeddata', () => {
       bgVideo = v
       bgVideoPath = m.path ? String(m.path) : null

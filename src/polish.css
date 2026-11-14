@@ -221,6 +221,13 @@ input[type="radio"]    { accent-color: var(--color-active); }
 }
 .desktop-only-link:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 .desktop-only-link i { color: var(--accent); }
+.toast .toast-action {
+  margin-left: 6px; pointer-events: auto; white-space: nowrap; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--btn-primary); color: var(--on-accent); border: none;
+  border-radius: 6px; padding: 4px 9px; font: inherit; font-size: 11px; font-weight: 600;
+}
+.toast .toast-action:hover { filter: brightness(1.1); }
 .toast .toast-link {
   margin-left: 6px; pointer-events: auto; white-space: nowrap;
   display: inline-flex; align-items: center; gap: 5px;

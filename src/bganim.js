@@ -6,6 +6,7 @@ import { t } from './i18n.js'
 import { setBgConfig } from './bg-spectrum.js'
 import { makeSendButton, imageMedia, VIDEO_TARGETS, IMAGE_TARGETS } from './media-bus.js'
 import { promptName } from './rename-dialog.js'
+import { createAudioDriver } from './audio-features.js'
 
 const TAU = Math.PI * 2
 
@@ -35,6 +36,8 @@ function injectStyles() {
 .bga-card-name{font-size:8.5px;color:var(--text-secondary);padding:3px 3px 4px;text-align:center;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bga-card.sel .bga-card-name{color:var(--color-active)}
 .bga-row{display:flex;align-items:center;gap:8px}
+.bga-audio-name{font-size:11px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:14px}
+.bga-icon-btn.on{border-color:var(--color-active);color:var(--color-active);background:color-mix(in srgb,var(--color-active) 12%,transparent)}
 .bga-row label{width:58px;flex-shrink:0;font-size:10px;color:var(--text-secondary)}
 .bga-slider{flex:1;min-width:0;height:3px;background:var(--win-border-in);border-radius:2px;outline:none;cursor:pointer;-webkit-appearance:none}
 .bga-slider::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--slider-color);cursor:pointer;border:2px solid var(--surface)}
@@ -209,6 +212,20 @@ export function initBgAnim(body) {
       </div>
     </div>
     <div class="bga-sec">
+      <div class="bga-sec-title">${t('audio_section')}</div>
+      <div class="bga-row">
+        <button class="bga-btn" id="bga-audio-pick" style="flex:1;justify-content:center"><i class="fa-solid fa-music"></i> <span>${t('audio_pick')}</span></button>
+        <button class="bga-icon-btn" id="bga-audio-mix" title="${t('audio_mix')}"><i class="fa-solid fa-sliders"></i></button>
+        <button class="bga-icon-btn" id="bga-audio-clear" title="${t('audio_clear')}"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="bga-audio-name" id="bga-audio-name"></div>
+      <div class="bga-row">
+        <label>${t('audio_react')}</label>
+        <input class="bga-slider" id="bga-react" type="range" min="0" max="10" step="1" value="6">
+        <span class="bga-sval" id="bga-react-val">6</span>
+      </div>
+    </div>
+    <div class="bga-sec">
       <div class="bga-sec-title">${t('pat_colors')}</div>
       <div class="bga-colors">
         <input class="bga-color" id="bga-c1" type="color" title="${t('bga_color_bg')}">
@@ -258,6 +275,14 @@ export function initBgAnim(body) {
   const themeCols = body.querySelector('#bga-theme-colors')
   const resSel    = body.querySelector('#bga-res')
   const presetSaveBtn = body.querySelector('#bga-preset-save')
+  const audioPickBtn  = body.querySelector('#bga-audio-pick')
+  const audioMixBtn   = body.querySelector('#bga-audio-mix')
+  const audioClearBtn = body.querySelector('#bga-audio-clear')
+  const audioNameEl   = body.querySelector('#bga-audio-name')
+  const reactSl       = body.querySelector('#bga-react')
+  const reactVal      = body.querySelector('#bga-react-val')
+  const audio = createAudioDriver()
+  let fx = null   // the sound's values for the current frame (null = no sound)
   const imgPickBtn  = body.querySelector('#bga-img-pick')
   const imgOpSl     = body.querySelector('#bga-img-op')
   const imgFitBtn   = body.querySelector('#bga-img-fit')
@@ -320,7 +345,13 @@ export function initBgAnim(body) {
   function presetMeta() { return PRESETS.find(p => p.id === curPreset) || PRESETS[0] }
   function cycleMs() { return presetMeta().cycle / (+speedSl.value / 4) }
   function params() {
-    return { inten: +intenSl.value / 10, scale: +scaleSl.value / 10, c1: C1, c2: C2, c3: C3 }
+    const P = { inten: +intenSl.value / 10, scale: +scaleSl.value / 10, c1: C1, c2: C2, c3: C3 }
+    if (fx) {   // a sound drives the animation: bass and beats push the intensity, loudness the scale
+      const r = +reactSl.value / 10
+      P.inten = Math.min(1.3, P.inten * (1 + r * (fx.bass * 0.9 + fx.beat * 0.8)))
+      P.scale = Math.min(1.35, P.scale * (1 + r * fx.level * 0.3))
+    }
+    return P
   }
 
   // ── Renderers — every time-dependent term is sin/cos(TAU·(k·phase + o))
@@ -757,8 +788,10 @@ export function initBgAnim(body) {
   // ── Single rAF loop, phase-accumulated (speed changes stay continuous) ────
   function frame(ts) {
     rafId = requestAnimationFrame(frame)
+    fx = audio.features()
     if (lastTs) {
-      const dp = Math.min(100, ts - lastTs) / cycleMs()
+      let dp = Math.min(100, ts - lastTs) / cycleMs()
+      if (fx) dp *= 1 + (+reactSl.value / 10) * (fx.level * 0.6 + fx.beat * 1.2)
       phase = (phase + dp) % 1
       if (recAcc !== null) {
         recAcc += dp
@@ -773,6 +806,7 @@ export function initBgAnim(body) {
     const active = playing && shown && document.visibilityState === 'visible' && document.contains(body)
     if (active && !rafId) { lastTs = 0; rafId = requestAnimationFrame(frame) }
     else if (!active && rafId) { cancelAnimationFrame(rafId); rafId = null }
+    if (audio.mode === 'file') { if (active) { if (!audio.playing) audio.play() } else audio.pause() }
   }
 
   // repaint the current phase once while paused (param/preset/resolution edits)
@@ -1024,6 +1058,47 @@ export function initBgAnim(body) {
   })
   refreshPlayBtn()
 
+  // ── Sound: the animation follows a sound file or the app's mix ────────────
+  function refreshAudioUi() {
+    audioNameEl.textContent = audio.mode === 'file' ? audio.name : audio.mode === 'mix' ? t('audio_mix') : t('audio_none')
+    audioMixBtn.classList.toggle('on', audio.mode === 'mix')
+    audioClearBtn.disabled = audio.mode === 'off'
+  }
+  async function loadSound(path, name) {
+    audioNameEl.textContent = t('audio_analysing')
+    try {
+      await audio.loadFile(path, name)
+      audio.element.loop = true
+      phase = 0
+      sync()
+    } catch { window.toast?.(t('audio_failed'), 'error') }
+    refreshAudioUi()
+  }
+  audioPickBtn.addEventListener('click', async () => {
+    if (recBusy) { window.toast?.(t('bga_rec_busy'), 'info'); return }
+    try {
+      const f = await window.__TAURI__.core.invoke('pick_audio_file')
+      if (f?.path) loadSound(f.path, f.name)
+    } catch {}
+  })
+  audioMixBtn.addEventListener('click', () => {
+    if (recBusy) return
+    if (audio.mode === 'mix') audio.clear(); else audio.useMix()
+    refreshAudioUi(); renderOnce()
+  })
+  audioClearBtn.addEventListener('click', () => {
+    if (recBusy) return
+    audio.clear(); fx = null
+    refreshAudioUi(); renderOnce()
+  })
+  reactSl.addEventListener('input', () => { reactVal.textContent = reactSl.value })
+  // "Open with…" from the Library / Search / Recents, or a sound sent by another tool.
+  body.addEventListener('iceample-media', e => {
+    const m = e.detail
+    if (m && m.kind === 'audio' && m.path) loadSound(m.path, m.name)
+  })
+  refreshAudioUi()
+
   // ── Theme background bridge (bg-spectrum) ─────────────────────────────────
   themeBtn.addEventListener('click', () => {
     setBgConfig({
@@ -1200,12 +1275,53 @@ export function initBgAnim(body) {
     }, 'image/png')
   })
 
+  // With a sound file: record from the start to the end of the sound, with the
+  // sound (the animation follows it live, as on screen) → Blob | null
+  function recordWithSound() {
+    if (recBusy) { window.toast?.(t('bga_rec_busy'), 'info'); return Promise.resolve(null) }
+    if (typeof MediaRecorder === 'undefined' || !audio.element) { window.toast?.(t('bga_save_fail'), 'error'); return Promise.resolve(null) }
+    return new Promise(resolve => {
+      const el = audio.element
+      const mime = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m))
+      const opts = { videoBitsPerSecond: Math.round(canvas.width * canvas.height * 6) }
+      if (mime) opts.mimeType = mime
+      const stream = canvas.captureStream(30)
+      const track = audio.audioTrack()
+      if (track) stream.addTrack(track)
+      let rec
+      try { rec = new MediaRecorder(stream, opts) }
+      catch { stream.getTracks().forEach(tr => tr.stop()); window.toast?.(t('bga_save_fail'), 'error'); resolve(null); return }
+      const wasPlaying = playing, wasLoop = el.loop
+      const chunks = []
+      const finish = () => {
+        el.removeEventListener('ended', onEnded)
+        el.loop = wasLoop
+        stream.getTracks().forEach(tr => tr.stop())
+        recBusy = false; curRecorder = null
+        playing = wasPlaying; refreshPlayBtn(); sync()
+      }
+      const onEnded = () => { try { rec.stop() } catch {} }
+      rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data) }
+      rec.onstop = () => { finish(); resolve(chunks.length ? new Blob(chunks, { type: 'video/webm' }) : null) }
+      recBusy = true; curRecorder = rec
+      el.loop = false
+      el.addEventListener('ended', onEnded)
+      audio.seek(0); phase = 0
+      playing = true; refreshPlayBtn(); sync(); audio.play()
+      window.toast?.(`${t('bga_recording')} (${audio.duration.toFixed(1)} s)`, 'info', Math.min(6000, audio.duration * 1000))
+      try { rec.start(200) }
+      catch { finish(); window.toast?.(t('bga_save_fail'), 'error'); resolve(null) }
+    })
+  }
+  const recordVideo = () => audio.mode === 'file' ? recordWithSound() : recordLoop()
+
   webmBtn.addEventListener('click', async () => {
     webmBtn.disabled = true
     try {
-      const blob = await recordLoop()
+      const blob = await recordVideo()
       if (blob) {
-        if (await saveBlobAs(blob, `fond-${curPreset}-boucle.webm`, 'webm', 'WebM Video')) window.toast?.(t('bga_saved'), 'success')
+        const fname = audio.mode === 'file' ? `fond-${curPreset}-son.webm` : `fond-${curPreset}-boucle.webm`
+        if (await saveBlobAs(blob, fname, 'webm', 'WebM Video')) window.toast?.(t('bga_saved'), 'success')
       }
     } catch { window.toast?.(t('bga_save_fail'), 'error') }
     webmBtn.disabled = false
@@ -1214,7 +1330,7 @@ export function initBgAnim(body) {
   // ── Media bus: one send button, video loop OR current frame by target ─────
   const sendBtn = makeSendButton(async targetId => {
     if (VIDEO_TARGETS.some(v => v.id === targetId)) {
-      const blob = await recordLoop()
+      const blob = await recordVideo()
       if (!blob) return null
       // NOTE: bus receivers own nothing — the emitter must NOT revoke this URL
       return { kind: 'video', blobUrl: URL.createObjectURL(blob), name: `fond-${curPreset}.webm` }
@@ -1231,6 +1347,7 @@ export function initBgAnim(body) {
     if (!document.contains(body)) {
       if (rafId) { cancelAnimationFrame(rafId); rafId = null }
       try { if (curRecorder && curRecorder.state !== 'inactive') curRecorder.stop() } catch {}
+      audio.dispose()
       document.getElementById('bga-user-menu')?.remove()   // menu lives on document.body
       ro.disconnect()
       document.removeEventListener('visibilitychange', onVis)

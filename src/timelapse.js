@@ -12,6 +12,7 @@ import { t } from './i18n.js'
 import { promptName } from './rename-dialog.js'
 import { trackRecentFile } from './recent.js'
 import { sendMedia } from './media-bus.js'
+import { mediaUrl } from './media-url.js'
 
 const IMG_EXT = ['png', 'jpg', 'jpeg', 'webp', 'bmp']
 const VID_EXT = ['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v']
@@ -315,7 +316,7 @@ export function initTimelapse(body) {
   // ── Video loading ─────────────────────────────────────────────────────────
   function loadVideo(path, name) {
     video = { path, name: name || baseName(path) }
-    vidEl.src = 'file://' + String(path).replace(/\\/g, '/')
+    mediaUrl(path).then(u => { vidEl.src = u }).catch(() => {})
     vidEl.style.display = 'block'
     vidHint.style.display = 'none'
     vidName.textContent = video.name
@@ -365,7 +366,7 @@ export function initTimelapse(body) {
   async function runFF(args, outPath, outName, folder) {
     window.toast?.(t('vc_running'), 'info')
     try {
-      await window.__TAURI__.core.invoke('ffmpeg_run', { args })
+      await window.__TAURI__.core.invoke('ffmpeg_run', { args: ['-y', ...args] })   // no stdin: ffmpeg can't ask before overwriting
       trackRecentFile(outPath, outName)
       window.dispatchEvent(new CustomEvent('iceample-library-changed', { detail: { folder } }))
       sendMedia('videorec', { kind: 'video', path: outPath, name: outName })

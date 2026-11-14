@@ -2112,6 +2112,109 @@ async fn ffmpeg_run(args: Vec<String>) -> Result<(), String> {
     }).await.map_err(|e| e.to_string())?
 }
 
+// ── FFmpeg jobs: progress + cancel ─────────────────────────────────────────────
+// Long renders (the montage export) report their position through the
+// `ffmpeg-progress` event ({ job, time } in seconds of OUTPUT) and can be
+// stopped with `ffmpeg_cancel(job)`. The child lives in a map while it runs so
+// the cancel command can kill it from another thread; the reading thread never
+// holds the lock while blocked on the pipe.
+
+fn ffmpeg_jobs() -> &'static std::sync::Mutex<std::collections::HashMap<String, std::process::Child>> {
+    static JOBS: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, std::process::Child>>> =
+        std::sync::OnceLock::new();
+    JOBS.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+fn ffmpeg_command() -> std::process::Command {
+    #[allow(unused_mut)]
+    let mut cmd = std::process::Command::new(sidecar_path("ffmpeg"));
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
+/// Last lines of ffmpeg's log: the useful part of an error, without the banner.
+fn ffmpeg_error_tail(log: &str) -> String {
+    let lines: Vec<&str> = log.lines().filter(|l| !l.trim().is_empty()).collect();
+    let start = lines.len().saturating_sub(6);
+    lines[start..].join("\n")
+}
+
+#[tauri::command]
+async fn ffmpeg_job(app: tauri::AppHandle, job: String, args: Vec<String>) -> Result<(), String> {
+    use std::io::{BufRead, Read};
+    use tauri::Emitter;
+    tauri::async_runtime::spawn_blocking(move || {
+        if let Some(parent) = args.last().map(std::path::Path::new).and_then(|p| p.parent()) {
+            if parent.is_absolute() && !parent.exists() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+        }
+        let mut child = ffmpeg_command()
+            .args(["-hide_banner", "-nostats", "-progress", "pipe:1"])
+            .args(&args)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("FFmpeg introuvable: {}", e))?;
+        let stdout = child.stdout.take().ok_or("no stdout")?;
+        let mut stderr = child.stderr.take().ok_or("no stderr")?;
+        // Drain stderr on its own thread so a chatty ffmpeg never blocks on a
+        // full pipe while we read the progress lines.
+        let err_reader = std::thread::spawn(move || {
+            let mut s = String::new();
+            let _ = stderr.read_to_string(&mut s);
+            s
+        });
+        ffmpeg_jobs().lock().map_err(|e| e.to_string())?.insert(job.clone(), child);
+        for line in std::io::BufReader::new(stdout).lines().map_while(Result::ok) {
+            if let Some(v) = line.strip_prefix("out_time_us=") {
+                if let Ok(us) = v.trim().parse::<i64>() {
+                    let _ = app.emit("ffmpeg-progress", serde_json::json!({ "job": job, "time": us.max(0) as f64 / 1_000_000.0 }));
+                }
+            }
+        }
+        let log = err_reader.join().unwrap_or_default();
+        // Gone from the map = ffmpeg_cancel took (and killed) it.
+        let child = ffmpeg_jobs().lock().map_err(|e| e.to_string())?.remove(&job);
+        let mut child = match child { Some(c) => c, None => return Err("cancelled".into()) };
+        let status = child.wait().map_err(|e| e.to_string())?;
+        if !status.success() {
+            return Err(ffmpeg_error_tail(&log));
+        }
+        Ok(())
+    }).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+fn ffmpeg_cancel(job: String) -> bool {
+    let child = ffmpeg_jobs().lock().ok().and_then(|mut m| m.remove(&job));
+    match child {
+        Some(mut c) => { let _ = c.kill(); let _ = c.wait(); true }
+        None => false,
+    }
+}
+
+/// ffmpeg's description of a media file (streams, duration, size). It always
+/// "fails" (no output file given), so the log is the answer.
+#[tauri::command]
+async fn ffmpeg_probe(path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let out = ffmpeg_command()
+            .args(["-hide_banner", "-i"])
+            .arg(&path)
+            .stdin(std::process::Stdio::null())
+            .output()
+            .map_err(|e| format!("FFmpeg introuvable: {}", e))?;
+        Ok(String::from_utf8_lossy(&out.stderr).into_owned())
+    }).await.map_err(|e| e.to_string())?
+}
+
 // ── PDF helpers ───────────────────────────────────────────────────────────────
 
 fn remap_obj_refs(
@@ -3084,6 +3187,9 @@ pub fn run() {
             extract_audio_artwork,
             generate_qrcode,
             ffmpeg_run,
+            ffmpeg_job,
+            ffmpeg_cancel,
+            ffmpeg_probe,
             whisper_transcribe,
             raw_embedded_preview,
             raw_develop,

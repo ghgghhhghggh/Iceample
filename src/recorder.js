@@ -7,6 +7,7 @@ import { promptName } from './rename-dialog.js'
 import { trackRecentFile } from './recent.js'
 import { sendMedia } from './media-bus.js'
 import { getMicStream, micConstraints, makeInputSwitch } from './devices.js'
+import { mediaUrlSync } from './media-url.js'
 
 export function initRecorder(body) {
   body.style.cssText = 'display:flex;flex-direction:column;height:100%;background:var(--surface);font-size:12px;font-family:inherit;'
@@ -98,7 +99,7 @@ export function initRecorder(body) {
   }
   function playTake(take) {
     liveVid.srcObject = null
-    liveVid.src = take.savedPath ? 'file://' + String(take.savedPath).replace(/\\/g, '/') : take.url
+    liveVid.src = (take.savedPath && mediaUrlSync(take.savedPath)) || take.url
     liveVid.muted = false; liveVid.controls = true
     liveVid.style.display = 'block'; hint.style.display = 'none'
     liveVid.play().catch(() => {})

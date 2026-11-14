@@ -21,6 +21,7 @@ import {
 import { t } from './i18n.js'
 import { registerTool } from './project.js'
 import { themeColor } from './theme.js'
+import { toastSaved } from './file-routes.js'
 
 // ── Track definitions ────────────────────────────────────────────────────────
 
@@ -818,7 +819,7 @@ function buildStrip(trackDef, isMaster, cleanups = []) {
               if (!path) return
               await window.__TAURI__.core.invoke('save_binary_file', { path, base64: ab2b64(wav) })
               window.dispatchEvent(new CustomEvent('iceample-library-changed', { detail: { folder: path.replace(/[\\/][^\\/]*$/, '') } }))
-              window.toast?.(t('mix_export_done'), 'success')
+              toastSaved(t('mix_export_done'), path)
             } else {
               const a = document.createElement('a')
               a.href = URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }))

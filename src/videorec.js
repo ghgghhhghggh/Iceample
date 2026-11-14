@@ -10,7 +10,10 @@ import { matchesShortcut } from './shortcuts.js'
 import { promptName, confirmUnsaved } from './rename-dialog.js'
 import { trackRecentFile } from './recent.js'
 import { sendMedia } from './media-bus.js'
+import { mediaUrl, mediaUrlSync } from './media-url.js'
 import { registerTool } from './project.js'
+import { routeMedia } from './devices.js'
+import { fxOf, fxDiff, cfgOf, ASPECTS, RESOLUTIONS, FPS_LIST, SPEEDS, exportSize, cropWindow, planRender, buildRenderArgs } from './videorec-render.js'
 
 function injectVrStyles() {
   if (document.getElementById('vr-styles')) return
@@ -20,7 +23,12 @@ function injectVrStyles() {
 .vr-body { display:flex; flex-direction:column; height:100%; background:var(--surface); }
 .vr-pzone { display:flex; flex-direction:column; flex-shrink:0; min-height:120px; }
 .vr-preview { position:relative; flex:1; min-height:0; background:color-mix(in srgb, var(--bg) 28%, black); display:flex; align-items:center; justify-content:center; overflow:hidden; }
-.vr-preview video { max-width:100%; max-height:100%; display:block; }
+/* The export frame (its aspect, black like the rendered file — content, not theme),
+   the clip's picture inside it, and the overlay clip on top. */
+.vr-frame { position:absolute; overflow:hidden; background:black; box-shadow:0 0 0 1px color-mix(in srgb, var(--text-primary) 12%, transparent); }
+.vr-pic { position:absolute; }
+.vr-pic > video, .vr-pic > img, .vr-ovl > video, .vr-ovl > img { position:absolute; display:block; object-fit:fill; transform-origin:50% 50%; }
+.vr-ovl { position:absolute; overflow:hidden; pointer-events:none; }
 .vr-preview-empty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:7px; color:var(--text-secondary); font-size:12px; pointer-events:none; }
 .vr-preview-empty i { font-size:22px; opacity:.4; }
 .vr-preview-badge { position:absolute; top:6px; left:8px; font-size:10px; color:var(--text-primary); background:color-mix(in srgb, var(--bg) 72%, transparent); border-radius:4px; padding:2px 6px; pointer-events:none; }
@@ -70,6 +78,33 @@ function injectVrStyles() {
 .vr-mk-spot { position:absolute; inset:0; }
 .vr-preview.vr-placing { cursor:crosshair; }
 .vr-preview.vr-placing video, .vr-preview.vr-placing .vr-mk-pin { pointer-events:none; }
+.vr-clip-h { position:absolute; top:0; bottom:0; width:8px; cursor:ew-resize; z-index:2; }
+.vr-clip-h.l { left:0 } .vr-clip-h.r { right:0 }
+.vr-clip-h::after { content:''; position:absolute; top:9px; bottom:9px; left:3px; width:2px; border-radius:1px; background:color-mix(in srgb, var(--text-primary) 55%, transparent); opacity:0; transition:opacity .12s; }
+.vr-clip:hover .vr-clip-h::after, .vr-clip.selected .vr-clip-h::after { opacity:1; }
+.vr-clip-badge { position:absolute; right:9px; bottom:3px; font-size:9px; line-height:1; padding:2px 4px; border-radius:3px; color:var(--text-primary); background:color-mix(in srgb, var(--bg) 70%, transparent); pointer-events:none; font-variant-numeric:tabular-nums; }
+.vr-clip-badge:empty { display:none; }
+.vr-ov-lane { position:relative; height:40px; border-bottom:1px solid var(--win-border-in); background:color-mix(in srgb, var(--vu-color-mid) 5%, transparent); }
+.vr-ov-lane .daw-clip { top:3px; height:34px; }
+.vr-ph-grip { position:absolute; top:-24px; left:-7px; width:16px; height:24px; cursor:ew-resize; pointer-events:auto; }
+.vr-controls .seq-btn { width:auto; min-width:28px; padding:0 7px; gap:5px; }
+.vr-lbl { font-size:11px; }
+.vr-body { container-type:inline-size; }
+@container (max-width: 780px) { .vr-lbl { display:none; } }
+.vr-actions.hidden { display:none; }
+.vr-job { display:none; align-items:center; gap:6px; font-size:10px; color:var(--text-secondary); min-width:150px; max-width:260px; flex:1; }
+.vr-job.on { display:flex; }
+.vr-job-lbl { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vr-job-bar { flex:1; min-width:50px; height:5px; border-radius:3px; background:color-mix(in srgb, var(--text-primary) 14%, transparent); overflow:hidden; }
+.vr-job-fill { height:100%; width:0; background:var(--accent); transition:width .2s; }
+.vr-job-bar.indet .vr-job-fill { width:30%; animation:vrIndet 1.2s linear infinite; }
+@keyframes vrIndet { from { transform:translateX(-100%) } to { transform:translateX(340%) } }
+.vr-job-pct { font-variant-numeric:tabular-nums; min-width:28px; text-align:right; }
+.vr-prop-sec { padding:7px 10px 2px; font-size:9px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--text-secondary); opacity:.8; }
+.vr-prop-chips { display:flex; flex-wrap:wrap; gap:4px; padding:2px 10px 5px; }
+.vr-chip { border:1px solid var(--win-border-in); border-radius:4px; padding:2px 7px; font-size:10px; cursor:pointer; font-family:inherit; color:var(--text-primary); background:var(--surface); }
+.vr-chip.on { background:color-mix(in srgb, var(--color-active) 30%, var(--surface)); border-color:color-mix(in srgb, var(--color-active) 60%, transparent); }
+.vr-chip:disabled { opacity:.4; cursor:default; }
   `
   document.head.appendChild(s)
 }
@@ -95,11 +130,22 @@ export function initVideoRec(body) {
   let loopStart = null, loopEnd = null, loopOn = false
   let selClip = null   // highlighted clip (drives the preview)
   let music = null     // { path, name, start, volume, fadeOut, duration } — one track under the lanes
+  // Export settings (aspect, resolution, frame rate, quality, framing): kept in
+  // the project, and the last ones used become the default of new montages.
+  const EXPORT_KEY = 'iceample:videorec:export'
+  let exportCfg = cfgOf((() => { try { return JSON.parse(localStorage.getItem(EXPORT_KEY) || 'null') } catch { return null } })())
+  const audioProbe = new Map()   // source path → Promise<boolean>: does it carry sound?
+  const IMG_EXT = /\.(png|jpe?g|webp|bmp|gif)$/i
+  const IMG_DUR = 5             // default length of a still image on the timeline (s)
+  let previewReady = false      // preview layout runs only once every part of the tool exists
 
   body.innerHTML = `
     <div class="vr-pzone" id="vr-pzone">
       <div class="vr-preview" id="vr-preview">
-        <video id="vr-vid" playsinline controls></video>
+        <div class="vr-frame" id="vr-frame">
+          <div class="vr-pic" id="vr-pic"><video id="vr-vid" playsinline></video><img id="vr-img" alt="" draggable="false" style="display:none"></div>
+          <div class="vr-ovl" id="vr-ovl" style="display:none"><video id="vr-ovid" playsinline></video><img id="vr-oimg" alt="" draggable="false" style="display:none"></div>
+        </div>
         <div class="vr-preview-empty" id="vr-empty">
           <i class="fa-solid fa-film"></i>${t('vr_no_clip')}
         </div>
@@ -115,18 +161,20 @@ export function initVideoRec(body) {
       </div>
     </div>
     <div class="vr-divider" id="vr-divider"><div class="vr-grip"></div></div>
-    <div class="daw-controls">
-      <button class="seq-btn" id="vr-add" title="${t('mic_add_lane')}"><i class="fa-solid fa-plus"></i></button>
-      <button class="seq-btn" id="vr-music" title="${t('vr_add_music')}"><i class="fa-solid fa-music"></i></button>
-      <button class="seq-btn" id="vr-text" title="${t('vr_add_text')}"><i class="fa-solid fa-font"></i></button>
-      <button class="seq-btn" id="vr-marker" title="${t('vr_mk_add')}"><i class="fa-solid fa-location-dot"></i></button>
-      <button class="seq-btn" id="vr-tpl" title="${t('vr_templates')}"><i class="fa-solid fa-shapes"></i></button>
-      <button class="seq-btn" id="vr-export" title="${t('vr_export_montage')}"><i class="fa-solid fa-file-export"></i></button>
+    <div class="daw-controls vr-controls">
+      <button class="seq-btn" id="vr-add" title="${t('mic_add_lane')}"><i class="fa-solid fa-plus"></i><span class="vr-lbl">${t('vr_lbl_lane')}</span></button>
+      <button class="seq-btn" id="vr-music" title="${t('vr_add_music')}"><i class="fa-solid fa-music"></i><span class="vr-lbl">${t('vr_lbl_music')}</span></button>
+      <button class="seq-btn" id="vr-text" title="${t('vr_add_text')}"><i class="fa-solid fa-font"></i><span class="vr-lbl">${t('vr_lbl_text')}</span></button>
+      <button class="seq-btn" id="vr-marker" title="${t('vr_mk_add')}"><i class="fa-solid fa-location-dot"></i><span class="vr-lbl">${t('vr_lbl_marker')}</span></button>
+      <button class="seq-btn" id="vr-tpl" title="${t('vr_templates')}"><i class="fa-solid fa-shapes"></i><span class="vr-lbl">${t('vr_lbl_tpl')}</span></button>
+      <button class="seq-btn" id="vr-tools" title="${t('vr_tools')}"><i class="fa-solid fa-screwdriver-wrench"></i><span class="vr-lbl">${t('vr_lbl_tools')}</span></button>
+      <button class="seq-btn" id="vr-export" title="${t('vr_export_montage')}"><i class="fa-solid fa-file-export"></i><span class="vr-lbl">${t('vr_lbl_export')}</span></button>
+      <div class="vr-job" id="vr-job"><span class="vr-job-lbl"></span><div class="vr-job-bar"><div class="vr-job-fill"></div></div><span class="vr-job-pct"></span><button class="seq-btn" id="vr-job-cancel" title="${t('vr_job_cancel')}"><i class="fa-solid fa-xmark"></i></button></div>
       <div style="flex:1"></div>
       <input class="seq-save-input" id="vr-name" type="text" placeholder="${t('vr_name_placeholder')}" maxlength="40" />
       <button class="seq-btn" id="vr-save" title="${t('vr_save')}"><i class="fa-solid fa-floppy-disk"></i></button>
     </div>
-    <div class="vr-actions" id="vr-actions">
+    <div class="vr-actions hidden" id="vr-actions">
       <button class="vr-act-btn" id="vr-set-in"><i class="fa-solid fa-arrow-right-to-bracket"></i> ${t('vc_set_in')}</button>
       <span class="vr-badge" id="vr-in-badge">0:00.0</span>
       <button class="vr-act-btn" id="vr-set-out"><i class="fa-solid fa-arrow-right-from-bracket"></i> ${t('vc_set_out')}</button>
@@ -170,6 +218,20 @@ export function initVideoRec(body) {
   const vidEl     = body.querySelector('#vr-vid')
   const emptyEl   = body.querySelector('#vr-empty')
   const badgeEl   = body.querySelector('#vr-badge')
+  const frameEl   = body.querySelector('#vr-frame')
+  const picEl     = body.querySelector('#vr-pic')
+  const imgEl     = body.querySelector('#vr-img')
+  const ovlEl     = body.querySelector('#vr-ovl')
+  const ovVid     = body.querySelector('#vr-ovid')
+  const ovImg     = body.querySelector('#vr-oimg')
+  const btnTools  = body.querySelector('#vr-tools')
+  const actionsEl = body.querySelector('#vr-actions')
+  const jobEl     = body.querySelector('#vr-job')
+  const jobLbl    = jobEl.querySelector('.vr-job-lbl')
+  const jobBar    = jobEl.querySelector('.vr-job-bar')
+  const jobFill   = jobEl.querySelector('.vr-job-fill')
+  const jobPct    = jobEl.querySelector('.vr-job-pct')
+  const jobCancel = body.querySelector('#vr-job-cancel')
 
   const setInBtn  = body.querySelector('#vr-set-in')
   const setOutBtn = body.querySelector('#vr-set-out')
@@ -234,12 +296,18 @@ export function initVideoRec(body) {
   // {kind:'video', path|blobUrl} → mounted as a clip appended after the last
   // clip on the timeline (same loadedmetadata path as the drop handler).
   body.addEventListener('iceample-media', e => receiveMedia(e.detail))
-  function receiveMedia(m) {
+  async function receiveMedia(m) {
     if (!m) return
     if (m.kind === 'icevid' && m.path) { loadProject(m.path, m.name); return }
     if (m.path && (m.kind === 'icetpl' || /\.icetpl$/i.test(m.path))) { loadTemplateFile(m.path); return }
+    // An audio file becomes the montage's music track.
+    if (m.kind === 'audio' && m.path) { setMusicFromPath(m.path); return }
+    // A still image becomes a picture clip (5 s, trimmable to any length).
+    if (m.kind === 'image') { addImageMedia(m); return }
     if (m.kind !== 'video') return
-    const url = m.path ? 'file://' + String(m.path).replace(/\\/g, '/') : (m.blobUrl || null)
+    // Local files go through media-url.js (the webview refuses file:// URLs).
+    let url = m.blobUrl || null
+    if (m.path) { try { url = await mediaUrl(m.path) } catch { url = null } }
     if (!url) return
     // A template placeholder waiting for media has priority over appending:
     // the first unfilled slot (by start time) receives the file. Blob-only
@@ -298,9 +366,10 @@ export function initVideoRec(body) {
     // are all optional — old .icevid files simply load with them off.
     if (Array.isArray(data.texts)) for (const d of data.texts) addTextItem(d)
     if (Array.isArray(data.markers)) for (const d of data.markers) addMarkerItem(d)
+    if (data.export) { exportCfg = cfgOf(data.export); layoutFrame() }
     music = data.music && data.music.path ? { start: 0, volume: 1, fadeOut: false, duration: null, ...data.music } : null
     pendingMusic = null
-    selectClip(null); updateRuler(); updateScrollbar(); updateTextOverlay(playheadTime)
+    selectClip(null); updateRuler(); updateScrollbar(); updateTextOverlay(playheadTime); syncVideoToTime(playheadTime)
   }
   // The montage as plain data — the .icevid file content, also what the
   // project auto-save keeps.
@@ -310,7 +379,8 @@ export function initVideoRec(body) {
       music: music ? { path: music.path, name: music.name || null, start: music.start || 0, volume: music.volume ?? 1, fadeOut: !!music.fadeOut, duration: music.duration ?? null } : null,
       texts: texts.map(tx => ({ text: tx.text, start: tx.start, dur: tx.dur, size: tx.size, color: tx.color, band: tx.band, pos: tx.pos })),
       markers: markers.map(m => ({ x: m.x, y: m.y, start: m.start, dur: m.dur, fn: m.fn, params: { ...m.params } })),
-      clips: clips.map(c => ({ laneIdx: c.laneIdx, startTime: c.startTime, duration: c.duration, srcIn: c.srcIn || 0, srcDur: c.srcDur ?? null, w: c.w || 0, h: c.h || 0, savedPath: c.savedPath || null, label: c.label || null, thumbnail: c.thumbnail || null, transition: c.transition || null, placeholder: !!c.placeholder })),
+      clips: clips.map(c => ({ laneIdx: c.laneIdx, startTime: c.startTime, duration: c.duration, srcIn: c.srcIn || 0, srcDur: c.srcDur ?? null, w: c.w || 0, h: c.h || 0, savedPath: c.savedPath || null, label: c.label || null, thumbnail: c.thumbnail || null, transition: c.transition || null, placeholder: !!c.placeholder, image: c.image || undefined, fx: fxDiff(c.fx) || undefined })),
+      export: { ...exportCfg },
     }
   }
 
@@ -340,6 +410,14 @@ export function initVideoRec(body) {
   const textTag = document.createElement('span'); textTag.className = 'vr-text-tag'; textTag.textContent = t('vr_text_lane')
   textLane.appendChild(textTag)
   innerEl.insertBefore(textLane, lanesEl)
+  // Overlay lane (picture-in-picture): its clips are drawn ABOVE the main
+  // sequence, at their own place and size (clip properties). laneIdx = -1.
+  const OV_H = 40
+  const ovLane = document.createElement('div'); ovLane.className = 'vr-ov-lane'
+  const ovTag = document.createElement('span'); ovTag.className = 'vr-text-tag'; ovTag.textContent = t('vr_lane_overlay')
+  ovLane.appendChild(ovTag)
+  innerEl.insertBefore(ovLane, lanesEl)
+  const laneEl = li => li === -1 ? ovLane : lanes[li]
   const texts = []
   let textId = 0
   function positionText(tx) { tx.el.style.left = (tx.start * ZOOM) + 'px'; tx.el.style.width = Math.max(14, tx.dur * ZOOM) + 'px' }
@@ -366,7 +444,7 @@ export function initVideoRec(body) {
     return Math.min(TIMELINE_DUR, Math.max(MIN_DUR, end + 30, viewRight + viewDur, (playheadTime || 0) + 30))
   }
   function snapTime(sec) { const g = 60 / getBpm(); return Math.round(sec / g) * g }
-  function updateInnerHeight() { innerEl.style.height = (RULER_H_PX + MARKER_H + TEXT_H + lanes.length * LANE_H_PX + MUSIC_H) + 'px' }
+  function updateInnerHeight() { innerEl.style.height = (RULER_H_PX + MARKER_H + TEXT_H + OV_H + lanes.length * LANE_H_PX + MUSIC_H) + 'px' }
   // NOTE: the old autoResizeWindow (window height driven by lane count) is
   // gone on purpose — it fought the user's manual preview/divider sizing.
   function contentEnd() { let e = 0; for (const c of clips) e = Math.max(e, c.startTime + c.duration); return e }
@@ -402,8 +480,9 @@ export function initVideoRec(body) {
     // Everything whose geometry depends on ZOOM / clip layout rides along:
     musicLane.style.width = totalW + 'px'
     textLane.style.width = totalW + 'px'
+    ovLane.style.width = totalW + 'px'
     markerLane.style.width = totalW + 'px'
-    positionMusic(); positionTexts(); positionMarkers(); renderJunctionBadges(); updateTotal()
+    positionMusic(); positionTexts(); positionMarkers(); renderJunctionBadges(); updateTotal(); refreshFrame()
   }
   function applyZoom(newZoom, cursorClientX) {
     const rect = scrollWrap.getBoundingClientRect(), cursorX = cursorClientX - rect.left
@@ -420,7 +499,7 @@ export function initVideoRec(body) {
     const at = cx => Math.max(0, (cx - sr.left + scrollWrap.scrollLeft) / ZOOM)
     const t0 = snapTime(at(e.clientX)); let dragged = false
     const onMove = ev => { if (Math.abs(ev.clientX - e.clientX) > 3) dragged = true; if (dragged) setRange(t0, snapTime(at(ev.clientX))) }
-    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); if (!dragged) { playheadTime = at(e.clientX); playheadEl.style.left = (playheadTime * ZOOM) + 'px'; updateTextOverlay(playheadTime) } }
+    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); if (!dragged) setPlayhead(at(e.clientX)) }
     document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp)
   })
 
@@ -481,7 +560,7 @@ export function initVideoRec(body) {
 
   // ── Thumbnail ─────────────────────────────────────────────────────────────
   function grabThumb(url, cb) {
-    const v = document.createElement('video'); v.preload = 'metadata'; v.muted = true; v.src = url
+    const v = document.createElement('video'); v.preload = 'metadata'; v.muted = true; v.crossOrigin = 'anonymous'; v.src = url
     v.addEventListener('loadeddata', () => {
       v.currentTime = 0.5
       v.addEventListener('seeked', () => {
@@ -492,23 +571,88 @@ export function initVideoRec(body) {
     v.addEventListener('error', () => cb(null), { once: true })
   }
 
+  // Still images: thumbnail and size through an <img>.
+  function loadImage(path) {
+    return mediaUrl(path).then(url => new Promise((res, rej) => {
+      const img = new Image()
+      img.onload = () => res({ img, url })
+      img.onerror = () => rej(new Error('image'))
+      img.src = url
+    }))
+  }
+  function imageThumb(img) {
+    try {
+      const c = document.createElement('canvas'); c.width = 120; c.height = 68
+      const k = Math.max(120 / img.naturalWidth, 68 / img.naturalHeight)
+      const w = img.naturalWidth * k, h = img.naturalHeight * k
+      c.getContext('2d').drawImage(img, (120 - w) / 2, (68 - h) / 2, w, h)
+      return c.toDataURL('image/jpeg', 0.6)
+    } catch { return null }
+  }
+  function setThumb(c, thumb) {
+    if (!thumb) return
+    c.thumbnail = thumb
+    c.el.querySelector('.vr-thumb')?.remove()
+    const img = document.createElement('img'); img.className = 'vr-thumb'; img.src = thumb; c.el.prepend(img)
+  }
+  // An image file for the timeline: a path already on disk, or (picture sent
+  // by another tool) saved once into the library's Images folder.
+  async function imagePath(m) {
+    if (m.path && IMG_EXT.test(m.path)) return m.path
+    if (!m.dataUrl || !root || !window.__TAURI__) return null
+    const ext = (/^data:image\/(png|jpeg|webp)/.exec(m.dataUrl) || [0, 'png'])[1].replace('jpeg', 'jpg')
+    const base = String(m.name || 'image').replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 40) || 'image'
+    const p = root + sep + 'Images' + sep + base + '-' + Date.now().toString(36) + '.' + ext
+    await window.__TAURI__.core.invoke('save_binary_file', { path: p, base64: m.dataUrl.split(',')[1] })
+    window.dispatchEvent(new CustomEvent('iceample-library-changed', { detail: { folder: root + sep + 'Images' } }))
+    return p
+  }
+  // `at` = timeline position (drop); none = after the last clip, or into the
+  // first empty template slot.
+  async function addImageMedia(m, laneIdx = 0, at = null) {
+    let p = null
+    try { p = await imagePath(m) } catch { p = null }
+    if (!p) { window.toast?.(t('vc_fail'), 'error'); return }
+    const name = m.name || String(p).split(/[\\/]/).pop()
+    if (at == null) {
+      const ph = clips.filter(c => c.placeholder).sort((a, b) => a.startTime - b.startTime)[0]
+      if (ph) { fillPlaceholder(ph, p, name); return }
+    }
+    let loaded
+    try { loaded = await loadImage(p) } catch { window.toast?.(t('vc_fail'), 'error'); return }
+    let start = at
+    if (start == null) { start = 0; for (const c of clips) start = Math.max(start, c.startTime + c.duration) }
+    const c = mountClip({ id: ++clipId, laneIdx, startTime: start, duration: IMG_DUR, srcDur: null, w: loaded.img.naturalWidth, h: loaded.img.naturalHeight, savedPath: p, label: name, image: true })
+    setThumb(c, imageThumb(loaded.img))
+    selectClip(c); updateRuler(); updateScrollbar()
+  }
+
   // ── Clip management ────────────────────────────────────────────────────────
   function positionClip(c) { c.el.style.left = (c.startTime * ZOOM) + 'px'; c.el.style.width = Math.max(4, c.duration * ZOOM) + 'px' }
-  function laneIdxFromY(clientY) { let best = 0; lanes.forEach((l, i) => { const r = l.getBoundingClientRect(); if (clientY >= r.top && clientY <= r.bottom) best = i }); return best }
-  function selectClip(c) {
+  function laneIdxFromY(clientY) { const ov = ovLane.getBoundingClientRect(); if (clientY >= ov.top && clientY <= ov.bottom) return -1; let best = 0; lanes.forEach((l, i) => { const r = l.getBoundingClientRect(); if (clientY >= r.top && clientY <= r.bottom) best = i }); return best }
+  // Selecting a clip highlights it, drives the clip tools and shows it in the
+  // preview: at the playhead when the playhead is inside it, else its first
+  // frame. `fromSync` = the playhead walked into it (playback / scrubbing).
+  function selectClip(c, fromSync) {
     clips.forEach(x => x.el.classList.remove('selected'))
     selClip = c
     updateActionState()
-    if (!c) { vidEl.src = ''; emptyEl.style.display = ''; badgeEl.style.display = 'none'; return }
+    if (!c) { badgeEl.style.display = 'none'; if (!fromSync) syncVideoToTime(playheadTime); return }
     c.el.classList.add('selected')
-    const src = c.videoUrl || (c.savedPath ? 'file://' + String(c.savedPath).replace(/\\/g, '/') : null)
-    if (src) { vidEl.src = src; emptyEl.style.display = 'none'; badgeEl.style.display = ''; badgeEl.textContent = c.label || c.savedPath?.split(/[\\/]/).pop() || 'clip' }
-    else { vidEl.src = ''; emptyEl.style.display = ''; badgeEl.style.display = 'none' }
+    badgeEl.style.display = ''; badgeEl.textContent = c.label || c.savedPath?.split(/[\\/]/).pop() || 'clip'
+    if (fromSync || c.laneIdx === -1) { if (!fromSync) syncVideoToTime(playheadTime); return }
+    const inside = playheadTime >= c.startTime && playheadTime < c.startTime + c.duration
+    if (inside) { vidClip = null; syncVideoToTime(playheadTime); return }
+    vidClip = c
+    showClipMedia(c)
+    picEl.style.opacity = '1'
+    if (!c.image && vidEl.getAttribute('src')) { vidEl.pause(); vidEl.currentTime = c.srcIn || 0 }
   }
   function mountClip(d) {
+    if (d.savedPath && !mediaUrlSync(d.savedPath)) mediaUrl(d.savedPath).catch(() => {})   // web: resolve once for the preview
     const el = document.createElement('div')
     el.className = 'daw-clip vr-clip mic-clip' + (d.placeholder ? ' vr-ph' : ''); el.dataset.clipId = d.id
-    el.innerHTML = '<i class="fa-solid fa-film"></i><span class="daw-clip-name"></span>'
+    el.innerHTML = '<i class="fa-solid ' + (d.image ? 'fa-image' : 'fa-film') + '"></i><span class="daw-clip-name"></span><span class="vr-clip-badge"></span><div class="vr-clip-h l"></div><div class="vr-clip-h r"></div>'
     el.querySelector('.daw-clip-name').textContent = d.label || ''
     if (d.placeholder) { const b = document.createElement('span'); b.className = 'vr-ph-dur'; b.textContent = (Math.round((d.duration || 0) * 10) / 10) + 's'; el.appendChild(b) }
     if (d.thumbnail) { const img = document.createElement('img'); img.className = 'vr-thumb'; img.src = d.thumbnail; el.prepend(img) }
@@ -518,15 +662,33 @@ export function initVideoRec(body) {
     // probe failures); the montage export picks its target resolution off it.
     // transition: { type, dur } applied at this clip's RIGHT edge on export.
     // placeholder: a template slot holding no media yet (skipped by export).
-    const clip = { id: d.id, laneIdx: d.laneIdx, startTime: d.startTime, duration: d.duration, srcIn: d.srcIn || 0, srcDur: d.srcDur ?? null, w: d.w || 0, h: d.h || 0, videoUrl: d.videoUrl || null, savedPath: d.savedPath || null, thumbnail: d.thumbnail || null, label: d.label || null, transition: d.transition || null, placeholder: !!d.placeholder, el }
-    clips.push(clip); positionClip(clip)
-    if (lanes[clip.laneIdx]) lanes[clip.laneIdx].appendChild(el)
+    const clip = { id: d.id, laneIdx: d.laneIdx, startTime: d.startTime, duration: d.duration, srcIn: d.srcIn || 0, srcDur: d.srcDur ?? null, w: d.w || 0, h: d.h || 0, videoUrl: d.videoUrl || null, savedPath: d.savedPath || null, thumbnail: d.thumbnail || null, label: d.label || null, transition: d.transition || null, placeholder: !!d.placeholder, image: !!d.image, fx: d.fx ? { ...d.fx } : null, el }
+    if (d.id > clipId) clipId = d.id
+    clips.push(clip); positionClip(clip); refreshClipBadge(clip)
+    if (laneEl(clip.laneIdx)) laneEl(clip.laneIdx).appendChild(el)
     makeDraggable(clip)
     el.addEventListener('click', e => { e.stopPropagation(); selectClip(clip) })
+    el.addEventListener('dblclick', e => { e.preventDefault(); e.stopPropagation(); if (!clip.placeholder) openClipProps(clip) })
     return clip
   }
-  function snapClip(c) { return { id: c.id, laneIdx: c.laneIdx, startTime: c.startTime, duration: c.duration, srcIn: c.srcIn || 0, srcDur: c.srcDur ?? null, w: c.w || 0, h: c.h || 0, videoUrl: c.videoUrl, savedPath: c.savedPath, thumbnail: c.thumbnail, label: c.label, transition: c.transition || null, placeholder: !!c.placeholder } }
+  // Small tag on the clip when it plays at another speed or has properties.
+  function refreshClipBadge(c) {
+    const b = c.el.querySelector('.vr-clip-badge'); if (!b) return
+    const fx = fxOf(c), parts = []
+    if (!c.image && fx.speed !== 1) parts.push(fx.speed + '\u00d7')
+    if (fxDiff({ ...c.fx, speed: 1, pos: 'br', size: 35, opacity: 100 })) parts.push('fx')
+    b.textContent = parts.join(' ')
+  }
+  function snapClip(c) { return { id: c.id, laneIdx: c.laneIdx, startTime: c.startTime, duration: c.duration, srcIn: c.srcIn || 0, srcDur: c.srcDur ?? null, w: c.w || 0, h: c.h || 0, videoUrl: c.videoUrl, savedPath: c.savedPath, thumbnail: c.thumbnail, label: c.label, transition: c.transition || null, placeholder: !!c.placeholder, image: !!c.image, fx: c.fx ? { ...c.fx } : null } }
   function unmountById(id) { const i = clips.findIndex(c => c.id === id); if (i >= 0) { if (selClip?.id === id) selectClip(null); clips[i].el.remove(); clips.splice(i, 1) } }
+  // Delete (Suppr / context menu), undoable.
+  function deleteClip(clip) {
+    const snap = snapClip(clip)
+    unmountById(clip.id); updateRuler(); updateScrollbar(); syncVideoToTime(playheadTime)
+    pushHistory('vr delete',
+      () => { mountClip(snap); updateRuler(); updateScrollbar(); syncVideoToTime(playheadTime) },
+      () => { unmountById(snap.id); updateRuler(); updateScrollbar(); syncVideoToTime(playheadTime) })
+  }
   function carveRange(t0, t1) {
     if (t1 <= t0) return
     const affected = clips.filter(c => c.startTime < t1 && c.startTime + c.duration > t0); if (!affected.length) return
@@ -536,7 +698,7 @@ export function initVideoRec(body) {
       // The left piece's right edge is now a fresh cut — its transition (if
       // any) stays with the ORIGINAL right edge, i.e. the right piece.
       if (cs < t0) { const nc = mountClip({ ...snapClip(c), id: ++clipId, startTime: cs, duration: t0 - cs, transition: null }); created.push(snapClip(nc)) }
-      if (ce > t1) { const nc = mountClip({ ...snapClip(c), id: ++clipId, startTime: t1, duration: ce - t1, srcIn: si + (t1 - cs) }); created.push(snapClip(nc)) }
+      if (ce > t1) { const nc = mountClip({ ...snapClip(c), id: ++clipId, startTime: t1, duration: ce - t1, srcIn: c.image ? 0 : si + (t1 - cs) * fxOf(c).speed }); created.push(snapClip(nc)) }
     })
     updateRuler(); updateScrollbar()
     pushHistory('vr carve', () => { created.forEach(p => unmountById(p.id)); removed.forEach(mountClip); updateRuler(); updateScrollbar() }, () => { removed.forEach(r => unmountById(r.id)); created.forEach(mountClip); updateRuler(); updateScrollbar() })
@@ -544,6 +706,8 @@ export function initVideoRec(body) {
   function makeDraggable(clip) {
     clip.el.addEventListener('mousedown', e => {
       if (e.button !== 0) return; e.preventDefault(); e.stopPropagation()
+      const hEl = e.target.closest('.vr-clip-h')
+      if (hEl) { startTrim(clip, hEl.classList.contains('l'), e); return }
       const rect = clip.el.getBoundingClientRect(), offsetX = e.clientX - rect.left
       const prevLane = clip.laneIdx, prevTime = clip.startTime
       const ghost = clip.el.cloneNode(true)
@@ -558,9 +722,9 @@ export function initVideoRec(body) {
         // run (the capture-phase click killer below would otherwise eat it).
         if (Math.abs(ev.clientX - e.clientX) <= 3 && Math.abs(ev.clientY - e.clientY) <= 3) return
         const sr = scrollWrap.getBoundingClientRect(), newLaneIdx = laneIdxFromY(ev.clientY)
-        const newTime = snapTime(Math.max(0, (ev.clientX - sr.left + scrollWrap.scrollLeft - offsetX) / ZOOM))
+        const newTime = (ev.altKey ? (x => x) : snapTime)(Math.max(0, (ev.clientX - sr.left + scrollWrap.scrollLeft - offsetX) / ZOOM))   // Alt: no grid
         const cid = clip.id
-        const applyPos = (li, ti) => { const c = clips.find(x => x.id === cid); if (!c) return; c.laneIdx = li; c.startTime = ti; positionClip(c); if (lanes[li] && !lanes[li].contains(c.el)) lanes[li].appendChild(c.el); updateRuler(); updateScrollbar() }
+        const applyPos = (li, ti) => { const c = clips.find(x => x.id === cid); if (!c) return; c.laneIdx = li; c.startTime = ti; positionClip(c); if (laneEl(li) && !laneEl(li).contains(c.el)) laneEl(li).appendChild(c.el); updateRuler(); updateScrollbar(); if (!isPlaying) { vidClip = null; syncVideoToTime(playheadTime) } }
         applyPos(newLaneIdx, newTime)
         if (prevLane !== newLaneIdx || Math.abs(prevTime - newTime) > 0.001) pushHistory('vr move', () => applyPos(prevLane, prevTime), () => applyPos(newLaneIdx, newTime))
         document.addEventListener('click', ev2 => ev2.stopPropagation(), { once: true, capture: true })
@@ -569,19 +733,63 @@ export function initVideoRec(body) {
     })
     clip.el.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); showClipMenu(e, clip) })
   }
+  // Edge trim: the left handle moves the start (and the source in-point), the
+  // right one the end. A video can't grow past its source; an image can.
+  // Edges stick to the other clips' edges and to the playhead (Alt: free).
+  // While dragging, the preview shows the frame at the moving edge.
+  function edgeSnap(tt, self, free) {
+    if (free) return tt
+    let best = tt, bd = 8 / ZOOM
+    const cands = [playheadTime, 0]
+    for (const c of clips) if (c !== self) cands.push(c.startTime, c.startTime + c.duration)
+    for (const v of cands) { const d = Math.abs(v - tt); if (d < bd) { bd = d; best = v } }
+    return best
+  }
+  function startTrim(clip, left, e) {
+    const x0 = e.clientX, s0 = clip.startTime, d0 = clip.duration, i0 = clip.srcIn || 0
+    const sp = clip.image ? 1 : fxOf(clip).speed, MIN = 0.1
+    const maxEnd = (!clip.image && clip.srcDur) ? s0 + (clip.srcDur - i0) / sp : Infinity
+    const minStart = clip.image ? 0 : Math.max(0, s0 - i0 / sp)
+    let moved = false
+    const onMove = ev => {
+      if (!moved && Math.abs(ev.clientX - x0) > 3) moved = true
+      if (!moved) return
+      const delta = (ev.clientX - x0) / ZOOM
+      if (left) {
+        const ns = Math.max(minStart, Math.min(edgeSnap(s0 + delta, clip, ev.altKey), s0 + d0 - MIN))
+        clip.startTime = ns; clip.duration = s0 + d0 - ns
+        if (!clip.image) clip.srcIn = Math.max(0, i0 + (ns - s0) * sp)
+      } else {
+        const ne = Math.max(s0 + MIN, Math.min(edgeSnap(s0 + d0 + delta, clip, ev.altKey), maxEnd))
+        clip.duration = ne - s0
+      }
+      positionClip(clip); renderJunctionBadges(); updateTotal()
+      if (!isPlaying) { vidClip = null; syncVideoToTime(left ? clip.startTime : clip.startTime + clip.duration - 0.04) }
+    }
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp)
+      if (!moved) return
+      document.addEventListener('click', ev2 => ev2.stopPropagation(), { once: true, capture: true })
+      const cid = clip.id, ns = clip.startTime, nd = clip.duration, ni = clip.srcIn || 0
+      const apply = (st, du, si) => { const c = clips.find(x => x.id === cid); if (!c) return; c.startTime = st; c.duration = du; c.srcIn = si; positionClip(c); updateRuler(); updateScrollbar(); if (!isPlaying) { vidClip = null; syncVideoToTime(playheadTime) } }
+      apply(ns, nd, ni)
+      if (Math.abs(ns - s0) > 0.001 || Math.abs(nd - d0) > 0.001) pushHistory('vr trim', () => apply(s0, d0, i0), () => apply(ns, nd, ni))
+    }
+    document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp)
+  }
   let _vrCtx = null
   function showClipMenu(e, clip) {
     if (_vrCtx) { _vrCtx.remove(); _vrCtx = null }
     const menu = document.createElement('div'); menu.className = 'daw-clip-ctx'; _vrCtx = menu
     const close = () => { menu.remove(); _vrCtx = null; document.removeEventListener('mousedown', onDoc) }
     const head = document.createElement('div'); head.className = 'daw-ctx-head'; head.innerHTML = `<i class="fa-solid fa-film"></i><span>${clip.label || 'Clip'}</span>`; menu.appendChild(head)
-    if ((clip.videoUrl || clip.savedPath) && window.__TAURI__) {
+    if (!clip.image && (clip.videoUrl || clip.savedPath) && window.__TAURI__) {
       const savBtn = document.createElement('button'); savBtn.className = 'daw-ctx-btn'
       savBtn.innerHTML = `<i class="fa-solid fa-floppy-disk"></i> ${t('clip_save_sample')}`
       savBtn.addEventListener('click', () => { close(); saveClip(clip) })
       menu.appendChild(savBtn)
     }
-    if (clip.videoUrl || clip.savedPath) {
+    if (!clip.image && (clip.videoUrl || clip.savedPath)) {
       // Media bus: hand this clip to the subtitles tool as its video background.
       const subBtn = document.createElement('button'); subBtn.className = 'daw-ctx-btn'
       subBtn.innerHTML = `<i class="fa-solid fa-closed-captioning"></i> ${t('send_to')} — ${t('tool_subtitles')}`
@@ -593,8 +801,14 @@ export function initVideoRec(body) {
       })
       menu.appendChild(subBtn)
     }
+    if (!clip.placeholder) {
+      const pr = document.createElement('button'); pr.className = 'daw-ctx-btn'
+      pr.innerHTML = `<i class="fa-solid fa-sliders"></i> ${t('vr_props')}`
+      pr.addEventListener('click', () => { close(); openClipProps(clip) })
+      menu.insertBefore(pr, menu.children[1] || null)
+    }
     const del = document.createElement('button'); del.className = 'daw-ctx-btn daw-ctx-del'; del.innerHTML = `<i class="fa-solid fa-trash"></i> ${t('clip_delete')}`
-    del.addEventListener('click', () => { close(); unmountById(clip.id); updateRuler(); updateScrollbar() })
+    del.addEventListener('click', () => { close(); deleteClip(clip) })
     menu.appendChild(del)
     menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'
     document.body.appendChild(menu)
@@ -606,7 +820,7 @@ export function initVideoRec(body) {
   }
   async function saveClip(clip) {
     if (!root || !window.__TAURI__) return
-    const src = clip.videoUrl || (clip.savedPath ? `file://${clip.savedPath}` : null); if (!src && !clip.videoUrl) return
+    const src = clip.videoUrl || clip.savedPath || null; if (!src) return
     const defName = clip.label || 'video_clip'
     const base = await promptName(defName.replace(/\.[^.]+$/, ''), { title: t('vr_save') }); if (base == null) return
     try {
@@ -636,6 +850,130 @@ export function initVideoRec(body) {
   }
   const hasUnsaved = () => clips.some(c => c.videoUrl && !c.savedPath)
 
+  // ── Clip properties ───────────────────────────────────────────────────────
+  // Popover editor (double-click a clip, or "Properties…" in its menu): speed,
+  // volume, fades, rotation / mirror, crop, colour and — on the overlay lane —
+  // place, size and opacity. Every change shows at once in the preview;
+  // closing keeps it and records ONE undo step. The export applies the same
+  // values (videorec-render.js).
+  function chipRow(pop, label, items, get, onPick) {
+    const sec = document.createElement('div'); sec.className = 'vr-prop-sec'; sec.textContent = label
+    const row = document.createElement('div'); row.className = 'vr-prop-chips'
+    const btns = items.map(([v, txt]) => {
+      const b = document.createElement('button'); b.className = 'vr-chip'; b.textContent = txt
+      b.addEventListener('click', ev => { ev.stopPropagation(); onPick(v); paint() })
+      row.appendChild(b)
+      return [v, b]
+    })
+    const paint = () => btns.forEach(([v, b]) => b.classList.toggle('on', get(v) === true || get() === v))
+    paint(); pop.append(sec, row)
+    return paint
+  }
+  function propSlider(pop, label, min, max, step, get, fmt, onInput) {
+    const row = popRow(label)
+    const out = document.createElement('span'); out.style.cssText = 'color:var(--text-primary);font-variant-numeric:tabular-nums;'
+    row.appendChild(out)
+    const inp = document.createElement('input'); inp.type = 'range'; inp.min = String(min); inp.max = String(max); inp.step = String(step)
+    inp.style.cssText = 'width:calc(100% - 20px);margin:0 10px 4px;accent-color:var(--slider-color);'
+    const paint = () => { inp.value = String(get()); out.textContent = fmt(get()) }
+    inp.addEventListener('input', () => { onInput(parseFloat(inp.value)); out.textContent = fmt(get()) })
+    paint(); pop.append(row, inp)
+    return paint
+  }
+  function openClipProps(clip, anchor) {
+    if (!clip || clip.placeholder) return
+    const cid = clip.id
+    const before = { fx: clip.fx ? { ...clip.fx } : null, duration: clip.duration }
+    const fx = fxOf(clip)
+    const isImg = !!clip.image, isOv = clip.laneIdx === -1
+    const maxSpan = () => (!isImg && clip.srcDur) ? Math.max(0.1, clip.srcDur - (clip.srcIn || 0)) : Infinity
+    const live = () => {
+      clip.fx = fxDiff(fx)
+      refreshFrame()   // a turned first clip changes the 'like the video' frame
+      positionClip(clip); refreshClipBadge(clip); renderJunctionBadges(); updateTotal()
+      if (shownClip === clip) layoutPicture()
+      if (shownOv === clip) layoutOverlay()
+      if (!isPlaying) { vidClip = null; syncVideoToTime(playheadTime) }
+    }
+    // Edit what you see: the playhead jumps onto the clip if it isn't on it.
+    if (!(playheadTime >= clip.startTime && playheadTime < clip.startTime + clip.duration)) setPlayhead(clip.startTime)
+    selectClip(clip)
+    const paints = []
+    actPopup(anchor || clip.el, (pop, finish) => {
+      pop.style.minWidth = '260px'; pop.style.maxHeight = 'min(560px, 80vh)'; pop.style.overflowY = 'auto'
+      const head = document.createElement('div'); head.className = 'vr-prop-sec'
+      head.style.cssText = 'text-transform:none;letter-spacing:0;font-size:11px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+      head.textContent = clip.label || 'Clip'
+      pop.appendChild(head)
+      if (!isImg) {
+        // A new speed keeps the same piece of the source: the clip gets
+        // shorter or longer on the timeline.
+        paints.push(chipRow(pop, t('vr_p_speed'), SPEEDS.map(v => [v, v + '\u00d7']), () => fx.speed, v => {
+          const span = Math.min(clip.duration * fx.speed, maxSpan())
+          fx.speed = v; clip.duration = Math.max(0.1, span / v); live(); updateRuler()
+        }))
+        paints.push(propSlider(pop, t('vr_p_volume'), 0, 200, 5, () => Math.round(fx.vol * 100), v => v + ' %', v => { fx.vol = v / 100; live() }))
+      } else {
+        paints.push(propSlider(pop, t('vr_p_duration'), 0.5, 30, 0.5, () => Math.round(clip.duration * 2) / 2, v => v + ' s', v => { clip.duration = v; live(); updateRuler() }))
+      }
+      paints.push(propSlider(pop, t('vr_p_fade_in'), 0, 3, 0.1, () => fx.fadeIn, v => v.toFixed(1) + ' s', v => { fx.fadeIn = v; live() }))
+      paints.push(propSlider(pop, t('vr_p_fade_out'), 0, 3, 0.1, () => fx.fadeOut, v => v.toFixed(1) + ' s', v => { fx.fadeOut = v; live() }))
+      paints.push(chipRow(pop, t('vr_p_rotate'), [[0, '0\u00b0'], [90, '90\u00b0'], [180, '180\u00b0'], [270, '270\u00b0']], () => fx.rot, v => { fx.rot = v; live() }))
+      paints.push(chipRow(pop, t('vr_p_flip'), [['h', t('vr_p_flip_h')], ['v', t('vr_p_flip_v')]],
+        v => v === 'h' ? fx.flipH : v === 'v' ? fx.flipV : undefined,
+        v => { if (v === 'h') fx.flipH = !fx.flipH; else fx.flipV = !fx.flipV; live() }))
+      const sec = txt => { const d = document.createElement('div'); d.className = 'vr-prop-sec'; d.textContent = txt; pop.appendChild(d) }
+      sec(t('vr_p_crop'))
+      paints.push(propSlider(pop, 'Zoom', 1, 3, 0.05, () => fx.zoom, v => '\u00d7' + v.toFixed(2), v => { fx.zoom = v; live() }))
+      paints.push(propSlider(pop, t('vr_p_crop_x'), 0, 100, 1, () => fx.cx, v => Math.round(v) + ' %', v => { fx.cx = v; live() }))
+      paints.push(propSlider(pop, t('vr_p_crop_y'), 0, 100, 1, () => fx.cy, v => Math.round(v) + ' %', v => { fx.cy = v; live() }))
+      sec(t('vr_p_color'))
+      paints.push(propSlider(pop, t('vr_p_bright'), -50, 50, 1, () => fx.bright, v => (v > 0 ? '+' : '') + Math.round(v), v => { fx.bright = v; live() }))
+      paints.push(propSlider(pop, t('vr_p_contrast'), 50, 150, 1, () => fx.contrast, v => Math.round(v) + ' %', v => { fx.contrast = v; live() }))
+      paints.push(propSlider(pop, t('vr_p_sat'), 0, 200, 1, () => fx.sat, v => Math.round(v) + ' %', v => { fx.sat = v; live() }))
+      paints.push(chipRow(pop, t('vr_p_look'), [['none', t('vr_look_none')], ['bw', t('vr_look_bw')], ['sepia', t('vr_look_sepia')]], () => fx.look, v => { fx.look = v; live() }))
+      if (isOv) {
+        sec(t('vr_lane_overlay'))
+        const posRow = popRow(t('vr_p_ov_pos'))
+        const grid = document.createElement('div'); grid.className = 'vr-pos-grid'
+        const cells = []
+        for (const yv of 'tcb') for (const xh of 'lcr') {
+          const b = document.createElement('button'); b.className = 'vr-pos-cell'; b.dataset.pos = yv + xh
+          b.addEventListener('click', ev => { ev.stopPropagation(); fx.pos = yv + xh; paintGrid(); live() })
+          grid.appendChild(b); cells.push(b)
+        }
+        const paintGrid = () => cells.forEach(b => b.classList.toggle('on', b.dataset.pos === fx.pos))
+        paintGrid(); paints.push(paintGrid)
+        posRow.appendChild(grid); pop.appendChild(posRow)
+        paints.push(propSlider(pop, t('vr_p_ov_size'), 10, 100, 1, () => fx.size, v => Math.round(v) + ' %', v => { fx.size = v; live() }))
+        paints.push(propSlider(pop, t('vr_p_opacity'), 10, 100, 1, () => fx.opacity, v => Math.round(v) + ' %', v => { fx.opacity = v; live() }))
+      }
+      const rs = popBtn(t('vr_p_reset'), 'fa-rotate-left')
+      rs.addEventListener('click', ev => {
+        ev.stopPropagation()
+        const span = Math.min(clip.duration * fx.speed, maxSpan())
+        Object.assign(fx, fxOf({ fx: isOv ? { pos: fx.pos, size: fx.size, opacity: fx.opacity } : null }))
+        if (!isImg) clip.duration = Math.max(0.1, span)
+        live(); updateRuler(); paints.forEach(p => p())
+      })
+      pop.appendChild(rs)
+    }).then(() => {
+      const c = clips.find(x => x.id === cid); if (!c) return
+      const after = { fx: c.fx ? { ...c.fx } : null, duration: c.duration }
+      if (JSON.stringify(before) === JSON.stringify(after)) return
+      const apply = st => {
+        const x = clips.find(y => y.id === cid); if (!x) return
+        x.fx = st.fx ? { ...st.fx } : null; x.duration = st.duration
+        positionClip(x); refreshClipBadge(x); updateRuler(); updateScrollbar()
+        if (shownClip === x) layoutPicture()
+        if (shownOv === x) layoutOverlay()
+        if (!isPlaying) { vidClip = null; syncVideoToTime(playheadTime) }
+      }
+      pushHistory('vr clip props', () => apply(before), () => apply(after))
+      updateRuler(); updateScrollbar()
+    })
+  }
+
   // ── Transitions between adjacent clips ────────────────────────────────────
   // One clickable diamond per junction: two clips on the SAME lane whose
   // edges touch (≤80ms apart). The chosen transition is stored on the LEFT
@@ -662,7 +1000,7 @@ export function initVideoRec(body) {
         el.className = 'vr-tj' + (left.transition && left.transition.type ? ' on' : '')
         el.title = t('vr_transition')
         el.style.left = ((left.startTime + left.duration) * ZOOM - 7) + 'px'
-        el.style.top = (RULER_H_PX + MARKER_H + TEXT_H + li * LANE_H_PX + LANE_H_PX / 2 - 7) + 'px'
+        el.style.top = (RULER_H_PX + MARKER_H + TEXT_H + OV_H + li * LANE_H_PX + LANE_H_PX / 2 - 7) + 'px'
         el.addEventListener('mousedown', ev => ev.stopPropagation())
         el.addEventListener('click', ev => { ev.stopPropagation(); openTransPopover(el, left) })
         innerEl.appendChild(el)
@@ -716,7 +1054,7 @@ export function initVideoRec(body) {
     }
     probe.addEventListener('loadedmetadata', () => done(isFinite(probe.duration) ? probe.duration : null), { once: true })
     probe.addEventListener('error', () => done(null), { once: true })
-    probe.src = 'file://' + String(p).replace(/\\/g, '/')
+    mediaUrl(p).then(u => { probe.src = u }).catch(() => done(null))
   }
   function openMusicPopover() {
     if (!music) return
@@ -773,10 +1111,142 @@ export function initVideoRec(body) {
   // transform on the <video>, and the transformed rect must never feed back
   // into overlay geometry (texts/pins stay put while the picture zooms, just
   // like the export where drawtext runs after the zoom).
-  function videoBox() {
-    if (vidEl.videoWidth && vidEl.getAttribute('src')) return { left: vidEl.offsetLeft, top: vidEl.offsetTop, width: vidEl.offsetWidth, height: vidEl.offsetHeight }
-    return { left: 0, top: 0, width: previewEl.clientWidth, height: previewEl.clientHeight }
+  // ── Preview frame ─────────────────────────────────────────────────────────
+  // The preview shows the EXPORT frame (aspect from the export settings, black
+  // bars or fill), the picture of the clip under the playhead inside it with
+  // its properties (crop, flips, rotation, colour, fades), and the overlay
+  // clip on top — the same composition videorec-render.js writes.
+  let frameRect = { left: 0, top: 0, width: 0, height: 0 }
+  let picRect = null      // picture box inside the frame
+  let shownClip = null    // clip whose media the main elements show
+  let shownOv = null      // overlay clip shown
+  function layoutFrame() {
+    const pw = previewEl.clientWidth, ph = previewEl.clientHeight
+    if (!pw || !ph) return
+    const { W, H } = exportSize(exportCfg, clips), a = W / H, pad = 6
+    let w = pw - pad * 2, h = w / a
+    if (h > ph - pad * 2) { h = ph - pad * 2; w = h * a }
+    w = Math.max(0, w); h = Math.max(0, h)
+    frameRect = { left: (pw - w) / 2, top: (ph - h) / 2, width: w, height: h }
+    frameEl.style.left = frameRect.left + 'px'; frameEl.style.top = frameRect.top + 'px'
+    frameEl.style.width = w + 'px'; frameEl.style.height = h + 'px'
   }
+  const mediaDims = (c, el) => {
+    const w = c.image ? el.naturalWidth : el.videoWidth, h = c.image ? el.naturalHeight : el.videoHeight
+    return { w: w || c.w || 16, h: h || c.h || 9 }
+  }
+  // Lays out a <video>/<img> in a bw×bh box with the clip's properties: crop
+  // through object-view-box, flips + rotation through the transform (a quarter
+  // turn swaps the element's own width and height), colour through filter.
+  function applyMediaFx(el, fx, bw, bh) {
+    const turned = fx.rot % 180 !== 0
+    const ew = turned ? bh : bw, eh = turned ? bw : bh
+    el.style.width = ew + 'px'; el.style.height = eh + 'px'
+    el.style.left = (bw - ew) / 2 + 'px'; el.style.top = (bh - eh) / 2 + 'px'
+    const tf = []
+    if (fx.rot) tf.push(`rotate(${fx.rot}deg)`)
+    if (fx.flipH || fx.flipV) tf.push(`scale(${fx.flipH ? -1 : 1},${fx.flipV ? -1 : 1})`)
+    el.style.transform = tf.join(' ')
+    if (fx.zoom > 1.001) {
+      const w = cropWindow(fx), pc = v => (v * 100).toFixed(2) + '%'
+      el.style.objectViewBox = `inset(${pc(w.t)} ${pc(1 - w.l - w.w)} ${pc(1 - w.t - w.h)} ${pc(w.l)})`
+    } else el.style.objectViewBox = ''
+    const f = []
+    if (fx.bright) f.push(`brightness(${(1 + fx.bright / 100).toFixed(3)})`)
+    if (fx.contrast !== 100) f.push(`contrast(${(fx.contrast / 100).toFixed(3)})`)
+    if (fx.sat !== 100) f.push(`saturate(${(fx.sat / 100).toFixed(3)})`)
+    if (fx.look === 'bw') f.push('grayscale(1)'); else if (fx.look === 'sepia') f.push('sepia(1)')
+    el.style.filter = f.join(' ')
+  }
+  function layoutPicture() {
+    const c = shownClip
+    if (!c || !frameRect.width) { picRect = null; picEl.style.display = 'none'; return }
+    const fx = fxOf(c), el = c.image ? imgEl : vidEl
+    let { w, h } = mediaDims(c, el)
+    if (fx.rot % 180) [w, h] = [h, w]
+    const fw = frameRect.width, fh = frameRect.height
+    const k = exportCfg.fit === 'cover' ? Math.max(fw / w, fh / h) : Math.min(fw / w, fh / h)
+    const pw = w * k, ph = h * k
+    picRect = { left: (fw - pw) / 2, top: (fh - ph) / 2, width: pw, height: ph }
+    picEl.style.display = ''
+    picEl.style.left = picRect.left + 'px'; picEl.style.top = picRect.top + 'px'
+    picEl.style.width = pw + 'px'; picEl.style.height = ph + 'px'
+    applyMediaFx(el, fx, pw, ph)
+  }
+  function layoutOverlay() {
+    const c = shownOv
+    if (!c || !frameRect.width) { ovlEl.style.display = 'none'; return }
+    const fx = fxOf(c), el = c.image ? ovImg : ovVid
+    let { w, h } = mediaDims(c, el)
+    if (fx.rot % 180) [w, h] = [h, w]
+    const fw = frameRect.width, fh = frameRect.height
+    const bw = fw * fx.size / 100, bh = bw * h / w, m = Math.min(fw, fh) * 0.04
+    const x = fx.pos[1] === 'l' ? m : fx.pos[1] === 'r' ? fw - bw - m : (fw - bw) / 2
+    const y = fx.pos[0] === 't' ? m : fx.pos[0] === 'b' ? fh - bh - m : (fh - bh) / 2
+    ovlEl.style.display = ''
+    ovlEl.style.left = x + 'px'; ovlEl.style.top = y + 'px'; ovlEl.style.width = bw + 'px'; ovlEl.style.height = bh + 'px'
+    applyMediaFx(el, fx, bw, bh)
+  }
+  // The frame follows the timeline (format 'like the video' = first clip) —
+  // re-laid out only when its size actually changes.
+  let frameKey = ''
+  function refreshFrame() {
+    if (!previewReady) return
+    const { W, H } = exportSize(exportCfg, clips)
+    const key = W + 'x' + H + ':' + exportCfg.fit + ':' + previewEl.clientWidth + 'x' + previewEl.clientHeight
+    if (key !== frameKey) { frameKey = key; relayoutPreview() }
+  }
+  function relayoutPreview() { layoutFrame(); layoutPicture(); layoutOverlay(); overlayKey = ''; mkFxKey = ''; updateTextOverlay(playheadTime) }
+  // Points the main elements at a clip's media (video or still image).
+  function showClipMedia(c) {
+    if (c === shownClip) return
+    shownClip = c || null
+    if (!c) { vidEl.pause(); vidEl.removeAttribute('src'); imgEl.removeAttribute('src'); layoutPicture(); return }
+    const src = c.videoUrl || (c.savedPath ? mediaUrlSync(c.savedPath) : null)
+    if (!src) {
+      // Web: the library file isn't resolved yet (restored project) — resolve, then retry.
+      picEl.style.display = 'none'
+      if (c.savedPath) mediaUrl(c.savedPath).then(u => { if (u && shownClip === c) { shownClip = null; vidClip = null; syncVideoToTime(playheadTime) } }).catch(() => {})
+      return
+    }
+    if (c.image) {
+      vidEl.pause(); vidEl.removeAttribute('src'); vidEl.style.display = 'none'
+      imgEl.style.display = ''; if (imgEl.getAttribute('src') !== src) imgEl.src = src
+    } else {
+      imgEl.style.display = 'none'; imgEl.removeAttribute('src')
+      vidEl.style.display = ''; if (vidEl.getAttribute('src') !== src) vidEl.src = src
+    }
+    layoutPicture()
+  }
+  function showOverlayMedia(c) {
+    shownOv = c || null
+    if (!c) { ovVid.pause(); ovVid.removeAttribute('src'); ovImg.removeAttribute('src'); ovlEl.style.display = 'none'; return }
+    const src = c.videoUrl || (c.savedPath ? mediaUrlSync(c.savedPath) : null)
+    if (!src) {
+      ovlEl.style.display = 'none'
+      if (c.savedPath) mediaUrl(c.savedPath).then(u => { if (u && shownOv === c) { shownOv = null; syncVideoToTime(playheadTime) } }).catch(() => {})
+      return
+    }
+    if (c.image) {
+      ovVid.pause(); ovVid.removeAttribute('src'); ovVid.style.display = 'none'
+      ovImg.style.display = ''; if (ovImg.getAttribute('src') !== src) ovImg.src = src
+    } else {
+      ovImg.style.display = 'none'; ovImg.removeAttribute('src')
+      ovVid.style.display = ''; if (ovVid.getAttribute('src') !== src) ovVid.src = src
+    }
+    layoutOverlay()
+  }
+  vidEl.addEventListener('loadedmetadata', layoutPicture)
+  imgEl.addEventListener('load', layoutPicture)
+  ovVid.addEventListener('loadedmetadata', layoutOverlay)
+  ovImg.addEventListener('load', layoutOverlay)
+  // Picture box (markers live on the picture) and frame box (titles live on
+  // the frame), both relative to previewEl.
+  function videoBox() {
+    if (picRect && shownClip && picEl.style.display !== 'none') return { left: frameRect.left + picRect.left, top: frameRect.top + picRect.top, width: picRect.width, height: picRect.height }
+    return { ...frameRect }
+  }
+  function frameBox() { return { ...frameRect } }
   // Live mirror of the burned result: shown only while the playhead sits in
   // [start, start+dur]. The overlay hugs the <video>'s rendered box (so
   // letterboxing doesn't shift positions) and font sizes scale with that
@@ -789,11 +1259,11 @@ export function initVideoRec(body) {
       overlayKey = ''
       return
     }
-    const vb = videoBox()
+    const vb = frameBox()
     txtOverlay.style.display = ''
     txtOverlay.style.left = vb.left + 'px'; txtOverlay.style.top = vb.top + 'px'
     txtOverlay.style.width = vb.width + 'px'; txtOverlay.style.height = vb.height + 'px'
-    const scale = (vb.height || 720) / 720
+    const scale = (Math.min(vb.width, vb.height) || 720) / 720   // same short-side reference as the export
     const key = scale.toFixed(3) + act.map(tx => [tx.id, tx.text, tx.size, tx.color, tx.band, tx.pos].join('|')).join('~')
     if (key === overlayKey) return   // playback tick calls every frame — rebuild only on change
     overlayKey = key
@@ -980,7 +1450,7 @@ export function initVideoRec(body) {
     if (!markers.length) {
       if (mkPins.style.display !== 'none') { mkPins.style.display = 'none'; mkFx.style.display = 'none'; mkFx.innerHTML = '' }
       mkFxKey = ''
-      if (vidEl.style.transform) { vidEl.style.transform = ''; vidEl.style.transformOrigin = '' }
+      if (picEl.style.transform) { picEl.style.transform = ''; picEl.style.transformOrigin = '' }
       return
     }
     const vb = videoBox()
@@ -1006,9 +1476,9 @@ export function initVideoRec(body) {
       const win = 1 / zs
       const cl = p => Math.max(0, Math.min(1 - win, p - win / 2))
       const lx = cl(zAct.x / 100), ly = cl(zAct.y / 100)
-      vidEl.style.transformOrigin = '0 0'
-      vidEl.style.transform = 'scale(' + zs.toFixed(4) + ') translate(' + (-lx * 100).toFixed(3) + '%,' + (-ly * 100).toFixed(3) + '%)'
-    } else if (vidEl.style.transform) { vidEl.style.transform = ''; vidEl.style.transformOrigin = '' }
+      picEl.style.transformOrigin = '0 0'
+      picEl.style.transform = 'scale(' + zs.toFixed(4) + ') translate(' + (-lx * 100).toFixed(3) + '%,' + (-ly * 100).toFixed(3) + '%)'
+    } else if (picEl.style.transform) { picEl.style.transform = ''; picEl.style.transformOrigin = '' }
     // Blur / spot mirrors — rebuilt only when the active set or the box
     // geometry changes (the playback tick calls this every frame).
     const act = markers.filter(m => (m.fn === 'blur' || m.fn === 'spot') && time >= m.start && time < m.start + m.dur)
@@ -1291,25 +1761,38 @@ export function initVideoRec(body) {
   // A template is durations-only — no media paths ever leave the app. Slots
   // land as ghost placeholder clips; dropping real media on one fills it.
   let pendingMusic = null   // a template's music prefs, consumed on next pick
-  function fillPlaceholder(ph, path, name) {
-    const url = 'file://' + String(path).replace(/\\/g, '/')
+  async function fillPlaceholder(ph, path, name) {
+    const label = name || String(path).split(/[\\/]/).pop() || 'clip'
+    const finish = () => {
+      ph.savedPath = path; ph.videoUrl = null; ph.label = label; ph.srcIn = 0
+      ph.placeholder = false
+      ph.el.classList.remove('vr-ph')
+      ph.el.querySelector('.vr-ph-dur')?.remove()
+      ph.el.querySelector('.daw-clip-name').textContent = label.slice(0, 22)
+      ph.el.querySelector('i.fa-solid')?.classList.replace('fa-film', ph.image ? 'fa-image' : 'fa-film')
+      positionClip(ph); refreshClipBadge(ph)
+      selectClip(ph); updateRuler(); updateScrollbar()
+    }
+    if (IMG_EXT.test(path)) {
+      // A picture keeps the slot's length (it can last as long as needed).
+      let loaded
+      try { loaded = await loadImage(path) } catch { window.toast?.(t('vc_fail'), 'error'); return }
+      ph.image = true; ph.srcDur = null; ph.w = loaded.img.naturalWidth; ph.h = loaded.img.naturalHeight
+      finish(); setThumb(ph, imageThumb(loaded.img))
+      return
+    }
+    let url
+    try { url = await mediaUrl(path) } catch { return }
     const v = document.createElement('video'); v.preload = 'metadata'; v.src = url
     v.addEventListener('loadedmetadata', () => {
       const mdur = v.duration || 0
-      ph.savedPath = path; ph.videoUrl = null
-      ph.label = name || String(path).split(/[\\/]/).pop() || 'clip'
-      ph.srcIn = 0; ph.srcDur = mdur || null
+      ph.image = false; ph.srcDur = mdur || null
       ph.w = v.videoWidth || 0; ph.h = v.videoHeight || 0
       // Longer media keeps the slot's duration (srcDur lets the export trim
       // it); shorter media keeps its own length and says so.
       if (mdur && mdur < ph.duration - 0.05) { ph.duration = mdur; window.toast?.(t('vr_ph_shorter'), 'info') }
-      ph.placeholder = false
-      ph.el.classList.remove('vr-ph')
-      ph.el.querySelector('.vr-ph-dur')?.remove()
-      ph.el.querySelector('.daw-clip-name').textContent = ph.label.slice(0, 22)
-      positionClip(ph)
-      grabThumb(url, thumb => { if (!thumb) return; ph.thumbnail = thumb; const img = document.createElement('img'); img.className = 'vr-thumb'; img.src = thumb; ph.el.prepend(img) })
-      selectClip(ph); updateRuler(); updateScrollbar()
+      finish()
+      grabThumb(url, thumb => setThumb(ph, thumb))
     }, { once: true })
     v.addEventListener('error', () => window.toast?.(t('vc_fail'), 'error'), { once: true })
   }
@@ -1329,7 +1812,7 @@ export function initVideoRec(body) {
     for (const s of tpl.slots) {
       const tr = s.transition
       mountClip({
-        id: ++clipId, laneIdx: Math.max(0, s.lane | 0), startTime: Math.max(0, +s.start || 0),
+        id: ++clipId, laneIdx: s.lane === -1 ? -1 : Math.max(0, s.lane | 0), startTime: Math.max(0, +s.start || 0),
         duration: Math.max(0.2, +s.duration || 1), label: s.label || null,
         transition: tr && (tr.type || typeof tr === 'string') ? { type: tr.type || tr, dur: +tr.dur || 0.5 } : null,
         placeholder: true,
@@ -1525,7 +2008,7 @@ export function initVideoRec(body) {
   setOutBtn.addEventListener('click', () => setOut(vidEl.currentTime))
 
   function updateActionState() {
-    const on = !!selClip && !ffRunning
+    const on = !!selClip && !selClip.image && !ffRunning
     ;[cutBtn, audioBtn, gifBtn, subsBtn, raudioBtn, speedBtn, chromaBtn, framesBtn, compBtn].forEach(b => { b.disabled = !on })
     btnExport.disabled = ffRunning
     btnExport.style.opacity = ffRunning ? '0.55' : '1'
@@ -1542,6 +2025,7 @@ export function initVideoRec(body) {
     if (!window.__TAURI__) { window.toast?.(t('vc_tauri_only'), 'warn'); return null }
     if (!selClip) { window.toast?.(t('vc_no_video'), 'warn'); return null }
     if (selClip.placeholder) { window.toast?.(t('vr_ph_fill_first'), 'warn'); return null }
+    if (selClip.image) { window.toast?.(t('vr_img_no_tools'), 'info'); return null }
     if (!selClip.savedPath) { window.toast?.(t('vc_need_saved'), 'warn'); return null }
     return selClip
   }
@@ -1553,28 +2037,28 @@ export function initVideoRec(body) {
   }
   // Busy state is owned by ffAction (which wraps the whole user action).
   // `quiet` suppresses the failure toast when the caller has a fallback to try.
-  // `-y` for the same reason as ffRaw: ffmpeg_run attaches no stdin, so the
-  // overwrite prompt would EOF-abort any export reusing a previous name.
+  // Runs through ffJob (progress bar + cancel; it adds `-y`, as ffmpeg has no
+  // stdin to ask before overwriting a previous result of the same name).
   async function runFF(args, outPath, outName, folder, quiet) {
-    window.toast?.(t('vc_running'), 'info')
-    try {
-      await window.__TAURI__.core.invoke('ffmpeg_run', { args: ['-y', ...args] })
+    const r = await ffJob(args, selClip?.srcDur || null, t('vc_running'))
+    if (r.ok) {
       trackRecentFile(outPath, outName)
       window.dispatchEvent(new CustomEvent('iceample-library-changed', { detail: { folder } }))
       window.toast?.(t('vc_done') + ' : ' + outName, 'success')
       return true
-    } catch (e) {
-      if (!quiet) window.toast?.(t('vc_fail') + ' : ' + e, 'error')
-      return false
     }
+    if (r.cancelled) { removeFile(outPath); window.toast?.(t('vr_job_cancelled'), 'info'); return false }
+    if (!quiet) window.toast?.(t('vc_fail') + ' : ' + r.error, 'error')
+    return false
   }
   const clipBase = c => (c.label || 'clip').replace(/\.[^.]+$/, '') || 'clip'
 
   // Mounts an ffmpeg RESULT right after the source clip. The output is its own
   // standalone file, so srcIn is 0 and srcDur is its OWN duration — never the
   // source's (otherwise the montage export would re-trim it).
-  function mountResult(outPath, label, srcLane, srcEnd, fallbackDur) {
-    const url = 'file://' + outPath.replace(/\\/g, '/')
+  async function mountResult(outPath, label, srcLane, srcEnd, fallbackDur) {
+    let url
+    try { url = await mediaUrl(outPath) } catch { return }
     const v = document.createElement('video'); v.preload = 'metadata'; v.src = url
     v.addEventListener('loadedmetadata', () => {
       const nc = mountClip({ id: ++clipId, laneIdx: srcLane, startTime: srcEnd, duration: v.duration || fallbackDur, srcDur: v.duration || null, w: v.videoWidth || 0, h: v.videoHeight || 0, savedPath: outPath, label })
@@ -1847,260 +2331,67 @@ export function initVideoRec(body) {
     })
   })
 
-  // ── Export montage ────────────────────────────────────────────────────────
-  // No transitions → lossless concat demuxer (stream copy, same as always).
-  // Any transition → xfade/acrossfade filter_complex chain (re-encode) at an
-  // adaptive target: 1920x1080 when any source exceeds 720p, else 1280x720.
-  // A music track adds a second ffmpeg pass over the finished montage.
+  // ── ffmpeg jobs: progress + cancel ────────────────────────────────────────
+  // Every ffmpeg run of the tool goes through `ffmpeg_job` (lib.rs): ffmpeg
+  // reports its position, the bar under the timeline shows it, and the ✕
+  // button kills the process. `total` = expected output length (s), or null.
+  let curJob = null
+  const clamp01 = v => Math.max(0, Math.min(1, v))
+  function setJobFrac(f) {
+    const known = f != null && Number.isFinite(f)
+    jobBar.classList.toggle('indet', !known)
+    jobFill.style.width = known ? Math.round(clamp01(f) * 100) + '%' : ''
+    jobPct.textContent = known ? Math.round(clamp01(f) * 100) + '%' : ''
+  }
+  async function ffJob(args, total, label) {
+    const job = 'vr-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7)
+    curJob = job
+    jobLbl.textContent = label; jobEl.classList.add('on'); setJobFrac(total ? 0 : null)
+    let unlisten = null
+    try {
+      unlisten = await window.__TAURI__.event.listen('ffmpeg-progress', e => {
+        const p = e.payload || {}
+        if (p.job === job && total) setJobFrac(p.time / total)
+      })
+    } catch { /* no events (web): the bar stays indeterminate */ }
+    try {
+      await window.__TAURI__.core.invoke('ffmpeg_job', { job, args: ['-y', ...args] })
+      return { ok: true }
+    } catch (e) {
+      const msg = String(e?.message ?? e)
+      return { ok: false, cancelled: msg === 'cancelled', error: msg }
+    } finally {
+      try { unlisten?.() } catch {}
+      if (curJob === job) { curJob = null; jobEl.classList.remove('on') }
+    }
+  }
+  jobCancel.addEventListener('click', () => { if (curJob) window.__TAURI__.core.invoke('ffmpeg_cancel', { job: curJob }).catch(() => {}) })
+  const removeFile = p => window.__TAURI__?.core.invoke('delete_file', { path: p }).catch(() => {})
 
-  // Bare ffmpeg run without runFF's success side-effects — used for the
-  // intermediate passes (text burn / music). Those write FIXED hidden names
-  // (.montage-pre.mp4 / .montage-txt.mp4), so `-y` is required: ffmpeg_run
-  // attaches no stdin and the overwrite prompt would fail every re-export.
-  async function ffRaw(args, quiet) {
-    try { await window.__TAURI__.core.invoke('ffmpeg_run', { args: ['-y', ...args] }); return true }
-    catch (e) { if (!quiet) window.toast?.(t('vc_fail') + ' : ' + e, 'error'); return false }
-  }
-  // A stored transition only counts while its junction is still LIVE: the next
-  // clip in export order sits on the same lane with edges touching (the same
-  // ≤80ms rule renderJunctionBadges uses). Dragging a clip away leaves a stale
-  // clip.transition behind with no badge to remove it — ignoring it here keeps
-  // the lossless `-c copy` concat and stops invisible crossfades in the export.
-  const transLive = (left, right) => !!(left.transition && left.transition.type && right && right.laneIdx === left.laneIdx && Math.abs(left.startTime + left.duration - right.startTime) <= 0.08)
-  // xfade OFFSET MATH — `offset` is when the transition STARTS on the stream
-  // chained so far: offset(k) = (chained length so far) - (transition dur k);
-  // each xfade then extends the chain to (chained + next clip - transition).
-  // Worked 3-clip example: durations 4s, 3s, 2s; transitions 0.5s then 1s:
-  //   step 1: offset = 4   - 0.5 = 3.5   chained = 4   + 3 - 0.5 = 6.5
-  //   step 2: offset = 6.5 - 1   = 5.5   chained = 6.5 + 2 - 1   = 7.5
-  //   total 7.5 = 4+3+2 - (0.5+1): every transition overlaps both neighbours,
-  //   and clip 2 fades in over [3.5,4] then out over [5.5,6.5]. Checks out.
-  function buildXfade(ordered, withAudio) {
-    // Adaptive target: 1080p as soon as ANY source exceeds 720p (unknown
-    // dims — old projects, failed probes — count as 720p), else the classic
-    // 1280x720 so pure-720p montages come out byte-identical to before.
-    // fps stays 30 either way.
-    const hd = ordered.some(c => (c.w || 0) > 1280 || (c.h || 0) > 720)
-    const TW = hd ? 1920 : 1280, TH = hd ? 1080 : 720
-    const v = [], a = []
-    ordered.forEach((c, i) => {
-      // Respect each fragment's srcIn/duration (split/carve slices).
-      const si = ffTime(c.srcIn || 0), d = ffTime(c.duration)
-      v.push(`[${i}:v]trim=start=${si}:duration=${d},setpts=PTS-STARTPTS,scale=${TW}:${TH}:force_original_aspect_ratio=decrease,pad=${TW}:${TH}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,settb=AVTB,format=yuv420p[v${i}]`)
-      if (withAudio) a.push(`[${i}:a]atrim=start=${si}:duration=${d},asetpts=PTS-STARTPTS,aformat=sample_fmts=fltp:sample_rates=44100:channel_layouts=stereo[a${i}]`)
-    })
-    let cum = ordered[0].duration, vOut = 'v0', aOut = 'a0'
-    const offsets = [0]   // export-time start of each clip on the chained stream
-    ordered.slice(1).forEach((c, k) => {
-      const tr = transLive(ordered[k], c) ? ordered[k].transition : null
-      // A junction with no transition still needs an xfade node to keep the
-      // chain shape — a 10ms fade reads as a plain cut.
-      let dur = tr && tr.type ? tr.dur : 0.01
-      dur = Math.max(0.01, Math.min(dur, ordered[k].duration - 0.05, c.duration - 0.05, cum - 0.05))
-      const type = tr && tr.type ? tr.type : 'fade'
-      const off = cum - dur
-      offsets.push(off)
-      v.push(`[${vOut}][v${k + 1}]xfade=transition=${type}:duration=${ffTime(dur)}:offset=${ffTime(off)}[vx${k + 1}]`)
-      vOut = `vx${k + 1}`
-      if (withAudio) { a.push(`[${aOut}][a${k + 1}]acrossfade=d=${ffTime(dur)}[ax${k + 1}]`); aOut = `ax${k + 1}` }
-      cum += c.duration - dur
-    })
-    return { graph: v.concat(a).join(';'), vOut, aOut, total: cum, offsets, targetH: TH }
-  }
-  // ── Text burn-in (drawtext) ───────────────────────────────────────────────
-  // escapeDrawtext — the text value crosses TWO parsers, so these characters
-  // need handling: backslash, single quote, colon, comma, semicolon, percent.
-  // Backslash and percent are escaped first for drawtext's own expansion
-  // pass; the whole value is then single-quoted for the filtergraph
-  // tokenizer, which turns colon, comma and semicolon into literals; a quote
-  // itself can't live inside quotes, so it becomes '\'' (close, escaped
-  // quote, reopen).
-  const escapeDrawtext = s => "'" + String(s)
-    .replace(/\\/g, '\\\\')
-    .replace(/%/g, '\\%')
-    .replace(/'/g, "'\\''") + "'"
-  // Timeline→export time: gaps collapse (concat) and transitions overlap
-  // (xfade), so a text's [start, end] is remapped through each clip's export
-  // offset before landing in enable='between(t,...)'.
-  function exportTimeMap(ordered, offsets, total) {
-    return tt => {
-      for (let i = 0; i < ordered.length; i++) {
-        const c = ordered[i]
-        if (tt <= c.startTime) return offsets[i]
-        if (tt < c.startTime + c.duration) return Math.min(total, offsets[i] + (tt - c.startTime))
-      }
-      return total
+  // ── Export montage ────────────────────────────────────────────────────────
+  // ONE ffmpeg pass (videorec-render.js) at the chosen size, frame rate and
+  // quality: the sequence with its black gaps and transitions, every clip's
+  // properties, markers, overlay clips, titles and the music.
+  const saveExportCfg = () => { try { localStorage.setItem(EXPORT_KEY, JSON.stringify(exportCfg)) } catch {} }
+  // Which sources carry sound (a silent source needs generated silence).
+  function hasAudioStream(path) {
+    if (!audioProbe.has(path)) {
+      audioProbe.set(path, window.__TAURI__.core.invoke('ffmpeg_probe', { path })
+        .then(log => /Stream #\d+:\d+[^\n]*: Audio:/.test(String(log)))
+        .catch(() => false))
     }
+    return audioProbe.get(path)
   }
-  // One drawtext per overlay, comma-chained. TXT_SIZES are px at the 720p
-  // reference; `refH` is the height of the frame actually being burned (the
-  // xfade target, or the first clip's own height on the concat pass), so
-  // fontsize and the band's boxborderw scale by refH/720 and the text keeps
-  // the same visual fraction on a 1080p render as on a 720p one — matching
-  // the live preview, which scales the same reference by its box height.
-  // The x/y margins are w/h expressions and scale by themselves.
-  function buildDrawtextChain(map, refH) {
-    const k = (refH || 720) / 720
-    return texts.map(tx => {
-      let st = map(tx.start), en = map(tx.start + tx.dur)
-      if (en <= st) en = st + 0.05   // fully collapsed into a cut: keep the graph valid
-      const yv = tx.pos?.[0] || 'b', xh = tx.pos?.[1] || 'c'
-      const x = xh === 'l' ? 'w*0.05' : xh === 'r' ? 'w-text_w-w*0.05' : '(w-text_w)/2'
-      const y = yv === 't' ? 'h*0.05' : yv === 'b' ? 'h-text_h-h*0.05' : '(h-text_h)/2'
-      const col = '0x' + String(tx.color || '').replace(/[^0-9a-fA-F]/g, '').padEnd(6, 'f').slice(0, 6)
-      let f = `drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf':text=${escapeDrawtext(tx.text)}` +
-        `:fontsize=${Math.round((TXT_SIZES[tx.size] || 36) * k)}:fontcolor=${col}:x=${x}:y=${y}` +
-        `:enable='between(t,${ffTime(st)},${ffTime(en)})'`
-      if (tx.band) f += `:box=1:boxcolor=black@0.5:boxborderw=${Math.round(14 * k)}`
-      return f
-    }).join(',')
-  }
-  // ── Marker burn-in ────────────────────────────────────────────────────────
-  // Markers land on the SAME final passes as the texts, through the same
-  // exportTimeMap remap. Chain order: blur regions → spot vignettes → zoom →
-  // drawtext, so blur/spot coordinates live in original frame space (and get
-  // magnified WITH the picture), while titles stay sharp above everything.
-  //
-  // ZOOM: the animated crop-size approach (crop=w='iw/Z(t)') was tested on
-  // ffmpeg 8 and does NOT animate — crop's w/h expressions are evaluated once
-  // at init (frames verified unzoomed mid-envelope). zoompan drives the
-  // envelope instead: its z/x/y expressions re-evaluate per frame via `time`.
-  // zoompan REWRITES output PTS at its own fps parameter, so its input must
-  // already be 30 fps CFR (the xfade graph is; the concat fx pass prepends
-  // fps=30 — verified: a 60 fps input through zoompan d=1:fps=30 without the
-  // normalization doubles the duration).
-  //
-  // Worked zoom example — marker at export t0=5s, factor 1.8, aller 0.4,
-  // maintien 1, retour 0.4 → t1=5.4, t2=6.4, t3=6.8; center x=60% y=40% on
-  // 1280x720:
-  //   z(time) = if(between(time,5,6.8),
-  //               if(lt(time,5.4), 1+0.8*(time-5)/0.4,      → z(5.2)=1.4
-  //               if(lt(time,6.4), 1.8,                     → z(5.9)=1.8
-  //                 1.8-0.8*(time-6.4)/0.4)), 1)            → z(6.6)=1.4
-  //   at 5.9s the source window is iw/1.8 × ih/1.8 = 711×400 px at
-  //   x = clip(1280*0.6 - 711/2, 0, 1280-711) = clip(412.4, 0, 569) = 412,
-  //   y = clip(720*0.4  - 400/2, 0, 720-400)  = clip(88,    0, 320) = 88,
-  //   scaled back to 1280x720 → 1.8× in on the point, clamped in-frame; at
-  //   z=1 the window is the whole frame and clip() collapses x/y to 0.
-  //   (Verified frame-by-frame against testsrc2 in development.)
-  //
-  // Overlapping ZOOM markers never compound: the nested if() chain tests
-  // markers in start order, so the earliest-starting one wins at any instant.
-  // Envelope segment bounds remap INDIVIDUALLY through exportTimeMap, so a
-  // marker spanning a collapsed gap keeps a valid export-side shape (a
-  // segment collapsed under 20 ms becomes a plain jump).
-  // Marker coords are fractions of the PICTURE the pin was placed on (the
-  // <video>'s own box — .vr-preview video is max-width/height only, so no
-  // letterbox inside it). The concat path burns that very picture, but
-  // buildXfade scales+pads every source into the 16:9 target, so there a pin
-  // must be remapped into padded-frame space or it lands in the black bars
-  // whenever the source aspect differs (1080x1920 → 607x1080 padded at x=656:
-  // 25% of the picture is 42% of the frame). Per marker, the clip under its
-  // start decides the letterbox — one marker rides one clip.
-  const MK_FULL = { fw: 1, fh: 1, ox: 0, oy: 0 }
-  function padPlacement(ordered, TW, TH) {
-    return m => {
-      const c = ordered.find(o => m.start >= o.startTime && m.start < o.startTime + o.duration) || ordered[0]
-      const w = (c && c.w) || 0, h = (c && c.h) || 0
-      if (!w || !h) return MK_FULL   // unknown dims → assume it already fills
-      const s = Math.min(TW / w, TH / h)
-      const fw = Math.min(1, w * s / TW), fh = Math.min(1, h * s / TH)
-      return { fw, fh, ox: (1 - fw) / 2, oy: (1 - fh) / 2 }
-    }
-  }
-  function buildMarkerGraph(inLabel, map, refW, refH, spotIdx, place) {
-    const k = (refH || 720) / 720
-    const at = place || (() => MK_FULL)
-    const nodes = []
-    let cur = inLabel, n = 0
-    const sorted = [...markers].sort((a, b) => a.start - b.start)
-    const mkRange = m => { let st = map(m.start), en = map(m.start + m.dur); if (en <= st) en = st + 0.05; return [st, en] }
-    for (const m of sorted) {
-      const pl = at(m)
-      const cx = (pl.ox + m.x / 100 * pl.fw).toFixed(4), cy = (pl.oy + m.y / 100 * pl.fh).toFixed(4)
-      if (m.fn === 'blur') {
-        // Square region blur (sober, standard for faces/plates): crop the
-        // zone, boxblur it, overlay it back. Side = 2×rayon% of frame height
-        // (even, clamped in-frame); crop and overlay use the SAME clamp
-        // expression so the patch never shifts.
-        const [st, en] = mkRange(m)
-        // radius% is of the PICTURE height, so it shrinks with the letterbox.
-        const side = `min(floor(ih*${(2 * (m.params.radius || 15) / 100 * pl.fh).toFixed(4)}/2)*2,floor(iw/2)*2)`
-        const lr = Math.max(2, Math.round(6 * (m.params.intensity || 2) * k))
-        n++
-        nodes.push(`[${cur}]split[mba${n}][mbb${n}]`)
-        nodes.push(`[mbb${n}]crop=w='${side}':h='${side}':x='min(max(iw*${cx}-out_w/2,0),iw-out_w)':y='min(max(ih*${cy}-out_h/2,0),ih-out_h)',boxblur=${lr}:2[mbf${n}]`)
-        nodes.push(`[mba${n}][mbf${n}]overlay=x='min(max(main_w*${cx}-overlay_w/2,0),main_w-overlay_w)':y='min(max(main_h*${cy}-overlay_h/2,0),main_h-overlay_h)':enable='between(t,${ffTime(st)},${ffTime(en)})'[mbo${n}]`)
-        cur = `mbo${n}`
-      } else if (m.fn === 'spot') {
-        const [st, en] = mkRange(m)
-        const idx = spotIdx.get(m.id)
-        if (idx == null) continue
-        n++
-        nodes.push(`[${cur}][${idx}:v]overlay=0:0:enable='between(t,${ffTime(st)},${ffTime(en)})'[msp${n}]`)
-        cur = `msp${n}`
-      }
-    }
-    const zooms = sorted.filter(m => m.fn === 'zoom').map(m => {
-      const p = m.params, aIn = +p.in || 0, hold = +p.hold || 0
-      const t0 = map(m.start), t1 = map(m.start + aIn), t2 = map(m.start + aIn + hold), t3 = map(m.start + m.dur)
-      return { m, t0, t1: Math.max(t1, t0), t2: Math.max(t2, t1), t3: Math.max(t3, t2) }
-    }).filter(z => z.t3 - z.t0 > 0.08)   // fully collapsed into a cut → no flash
-    // zoompan's `s` is the HARD output resolution, so a wrong refW/refH would
-    // silently re-encode the montage at that size. Unknown dims → skip the
-    // zoom node rather than force 1280x720 onto a 1080p source.
-    if (zooms.length && refW && refH) {
-      let zExpr = '1'
-      let xExpr = 'clip(iw*0.5-(iw/zoom)/2,0,iw-iw/zoom)'
-      let yExpr = 'clip(ih*0.5-(ih/zoom)/2,0,ih-ih/zoom)'
-      for (let i = zooms.length - 1; i >= 0; i--) {   // built inside-out: marker 0 ends up outermost
-        const z = zooms[i], f = Math.max(1.01, +z.m.params.factor || 1.8).toFixed(3)
-        const up = z.t1 - z.t0 > 0.02 ? `1+(${f}-1)*(time-${ffTime(z.t0)})/${(z.t1 - z.t0).toFixed(3)}` : f
-        const down = (!z.m.params.cut && z.t3 - z.t2 > 0.02) ? `${f}-(${f}-1)*(time-${ffTime(z.t2)})/${(z.t3 - z.t2).toFixed(3)}` : '1'
-        const inner = `if(lt(time,${ffTime(z.t1)}),${up},if(lt(time,${ffTime(z.t2)}),${f},${down}))`
-        const cond = `between(time,${ffTime(z.t0)},${ffTime(z.t3)})`
-        zExpr = `if(${cond},${inner},${zExpr})`
-        const zp = at(z.m)
-        const cx = (zp.ox + z.m.x / 100 * zp.fw).toFixed(4), cy = (zp.oy + z.m.y / 100 * zp.fh).toFixed(4)
-        xExpr = `if(${cond},clip(iw*${cx}-(iw/zoom)/2,0,iw-iw/zoom),${xExpr})`
-        yExpr = `if(${cond},clip(ih*${cy}-(ih/zoom)/2,0,ih-ih/zoom),${yExpr})`
-      }
-      n++
-      // s must be even for the yuv420p encode; odd source dims round down.
-      nodes.push(`[${cur}]zoompan=z='${zExpr}':x='${xExpr}':y='${yExpr}':d=1:s=${Math.max(2, (refW || 1280) & ~1)}x${Math.max(2, (refH || 720) & ~1)}:fps=30[mzp${n}]`)
-      cur = `mzp${n}`
-    }
-    return { graph: nodes.join(';'), out: cur }
-  }
-  // Spot vignettes are painted client-side at the export resolution (canvas →
-  // PNG with alpha, same radial formula as the live preview), saved as hidden
-  // intermediates next to .concat-list.txt, then overlaid full-frame with
-  // enable=between(...). One PNG per spot marker; the caller assigns each
-  // file's ffmpeg input index.
-  // Real pixel size of an on-disk video, through the same hidden-<video>
-  // metadata path the timeline uses. Resolves {w:0,h:0} on error/timeout so a
-  // caller can skip resolution-dependent nodes instead of guessing a size.
-  function probeVideoSize(path) {
-    return new Promise(resolve => {
-      const v = document.createElement('video'); v.preload = 'metadata'
-      let done = false
-      const fin = (w, h) => { if (done) return; done = true; clearTimeout(to); v.removeAttribute('src'); resolve({ w: w || 0, h: h || 0 }) }
-      const to = setTimeout(() => fin(0, 0), 5000)
-      v.addEventListener('loadedmetadata', () => fin(v.videoWidth, v.videoHeight), { once: true })
-      v.addEventListener('error', () => fin(0, 0), { once: true })
-      v.src = 'file://' + String(path).replace(/\\/g, '/')
-    })
-  }
+  // Spot vignettes are painted here at the export size (canvas → PNG with
+  // alpha, same radial formula as the live preview) and overlaid full-frame;
+  // the files are deleted after the render.
   async function writeSpotPngs(W, H, place) {
     const spots = markers.filter(m => m.fn === 'spot')
     const files = []
-    const at = place || (() => MK_FULL)
     for (const m of spots) {
       const cnv = document.createElement('canvas'); cnv.width = W; cnv.height = H
       const ctx = cnv.getContext('2d')
-      // Same picture→padded-frame remap as the graph: the mask covers the WHOLE
-      // target frame, but the pin and the radius are fractions of the picture.
-      const pl = at(m)
+      const pl = place(m)
       const cx = (pl.ox + m.x / 100 * pl.fw) * W, cy = (pl.oy + m.y / 100 * pl.fh) * H
       const r0 = Math.max(1, (m.params.radius || 25) / 100 * H * pl.fh)
       const a = Math.max(0, Math.min(0.9, (m.params.dark || 60) / 100))
@@ -2108,178 +2399,86 @@ export function initVideoRec(body) {
       g.addColorStop(0, 'rgba(0,0,0,0)')
       g.addColorStop(1, 'rgba(0,0,0,' + a + ')')   // canvas extends the last stop past the outer circle
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H)
-      const b64 = cnv.toDataURL('image/png').split(',')[1]
       const p = root + sep + '.montage-spot-' + (files.length + 1) + '.png'
-      await window.__TAURI__.core.invoke('save_binary_file', { path: p, base64: b64 })
+      await window.__TAURI__.core.invoke('save_binary_file', { path: p, base64: cnv.toDataURL('image/png').split(',')[1] })
       files.push(p)
     }
-    return { spots, files }
+    return files
   }
-  // Second pass: lay the music track under the finished montage. Quiet-try
-  // mixing with the montage's own audio first; a montage with NO audio stream
-  // makes [0:a] fail — retry with the music alone under the picture.
-  // amix normalizes by default (each input scaled by 1/n, swelling back when
-  // one ends) — normalize=0 keeps the montage audio at full level; the music
-  // is already attenuated by its own volume filter.
-  async function musicPass(srcPath, outPath, totalDur, outName, folder) {
-    const ms = Math.max(0, Math.round((music.start || 0) * 1000))
-    let chain = `adelay=${ms}|${ms},volume=${(music.volume ?? 1).toFixed(2)}`
-    if (music.fadeOut) {
-      const end = Math.min(totalDur, (music.start || 0) + (music.duration || totalDur))
-      chain += `,afade=t=out:st=${ffTime(Math.max(0, end - 2))}:d=2`
-    }
-    const inputs = ['-i', srcPath, '-i', music.path]
-    const enc = ['-map', '0:v', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k']
-    let ok = await runFF([...inputs, '-filter_complex', `[1:a]${chain}[m];[0:a][m]amix=inputs=2:duration=first:normalize=0[a]`, ...enc, '-map', '[a]', outPath], outPath, outName, folder, true)
-    if (!ok) ok = await runFF([...inputs, '-filter_complex', `[1:a]${chain},atrim=0:${ffTime(totalDur)}[a]`, ...enc, '-map', '[a]', '-shortest', outPath], outPath, outName, folder)
-    return ok
+  // Settings popover: format, resolution, frame rate, quality, framing.
+  // Each choice applies at once (the preview frame follows) and is remembered.
+  function openExportPanel() {
+    return actPopup(btnExport, (pop, finish) => {
+      pop.style.minWidth = '250px'
+      const head = document.createElement('div'); head.className = 'vr-prop-sec'; head.textContent = t('vr_export_montage'); pop.appendChild(head)
+      const info = document.createElement('div'); info.style.cssText = 'padding:2px 10px 4px;font-size:10px;color:var(--text-secondary);font-variant-numeric:tabular-nums;'
+      const paintInfo = () => {
+        const { W, H } = exportSize(exportCfg, clips)
+        const real = clips.filter(c => !c.placeholder && c.laneIdx >= 0)
+        info.textContent = W + ' × ' + H + ' · ' + exportCfg.fps + ' ' + t('vr_fps_unit') + (real.length ? ' · ' + fmtTime(planRender({ clips: real, cfg: exportCfg }).total) : '')
+      }
+      const set = (key, v) => { exportCfg = cfgOf({ ...exportCfg, [key]: v }); saveExportCfg(); relayoutPreview(); paintInfo() }
+      const RES_LBL = { 480: '480p', 720: '720p', 1080: '1080p', 1440: '1440p', 2160: '4K' }
+      chipRow(pop, t('vr_exp_format'), ASPECTS.map(a => [a, a === 'auto' ? t('vr_exp_auto') : a]), () => exportCfg.aspect, v => set('aspect', v))
+      chipRow(pop, t('vr_exp_res'), RESOLUTIONS.map(r => [r, RES_LBL[r]]), () => exportCfg.res, v => set('res', v))
+      chipRow(pop, t('vr_exp_fps'), FPS_LIST.map(f => [f, String(f)]), () => exportCfg.fps, v => set('fps', v))
+      chipRow(pop, t('vr_exp_quality'), [['high', t('vr_q_high')], ['standard', t('vr_q_std')], ['light', t('vr_q_light')]], () => exportCfg.quality, v => set('quality', v))
+      chipRow(pop, t('vr_exp_fit'), [['contain', t('vr_fit_contain')], ['cover', t('vr_fit_cover')]], () => exportCfg.fit, v => set('fit', v))
+      paintInfo(); pop.appendChild(info)
+      const go = popBtn(t('vr_exp_go'), 'fa-file-export')
+      go.style.fontWeight = '600'
+      go.addEventListener('click', () => finish('go'))
+      pop.appendChild(go)
+    })
   }
-  btnExport.addEventListener('click', () => {
+  btnExport.addEventListener('click', async () => {
     if (ffRunning) return
-    if (!window.__TAURI__) { window.toast?.(t('vc_tauri_only'), 'warn'); return }
-    // Template placeholders hold no media — they are skipped, with a nudge.
+    if (await openExportPanel() === 'go') exportMontage()
+  })
+  function exportMontage() {
+    if (!window.__TAURI__ || window.__ICEAMPLE_WEB__) { window.toast?.(t('vc_tauri_only'), 'warn'); return }
     if (clips.some(c => c.placeholder)) window.toast?.(t('vr_ph_fill_first'), 'warn')
     const real = clips.filter(c => !c.placeholder)
-    if (!real.length) { window.toast?.(t('vc_no_video'), 'warn'); return }
-    const ordered = [...real].sort((a, b) => a.startTime - b.startTime)
-    if (ordered.some(c => !c.savedPath)) { window.toast?.(t('vr_need_all_saved'), 'warn'); return }
+    if (!real.some(c => c.laneIdx >= 0)) { window.toast?.(t('vc_no_video'), 'warn'); return }
+    if (real.some(c => !c.savedPath)) { window.toast?.(t('vr_need_all_saved'), 'warn'); return }
     const lib = libInfo(); if (!lib) return
     ffAction(async () => {
       const base = await promptName(nameInp.value.trim() || t('vr_default_name'), { title: t('vr_export_montage') }); if (!base) return
       const folder = lib.root + lib.sep + 'Vidéos'
-      const outPath = folder + lib.sep + base + '.mp4'
-      const outName = base + '.mp4'
-      const hasTrans = ordered.slice(0, -1).some((c, i) => transLive(c, ordered[i + 1]))
-      const withMusic = !!(music && music.path)
-      const withTexts = texts.length > 0
-      const withMarkers = markers.length > 0
-      // Stage plan: montage → [fx burn (texts + markers) on the concat path —
-      // the xfade graph burns both inline] → [music]. Only the FINAL stage
-      // goes through runFF so toasts/recents track the finished file; earlier
-      // stages land in hidden intermediates (ffmpeg can't overwrite its own
-      // input). With no texts, no markers and no music this is exactly the
-      // stage-1 behavior — pure `-c copy` concat included.
-      const needFxPass = (withTexts || withMarkers) && !hasTrans
-      const pre1 = lib.root + lib.sep + '.montage-pre.mp4'
-      const pre2 = lib.root + lib.sep + '.montage-txt.mp4'
-      const s1Final = !needFxPass && !withMusic
-      const target = s1Final ? outPath : pre1
-      const run = s1Final ? (args, quiet) => runFF(args, outPath, outName, folder, quiet) : (args, quiet) => ffRaw(args, quiet)
-      if (!s1Final) window.toast?.(t('vc_running'), 'info')
-      let ok, totalDur
-      if (!hasTrans) {
-        const escapePath = p => String(p).replace(/\\/g, '/').replace(/'/g, "'\\''")
-        const listPath = lib.root + lib.sep + '.concat-list.txt'
-        // Trimmed fragments (split/carve) carry srcIn/duration into the concat
-        // demuxer via inpoint/outpoint so the export matches the timeline
-        // instead of re-emitting each source file in full.
-        const content = ordered.map(c => {
-          const si = c.srcIn || 0
-          const trimmed = si > 0 || (c.srcDur != null && c.duration < c.srcDur - 0.05)
-          const lines = [`file '${escapePath(c.savedPath)}'`]
-          if (trimmed) { lines.push(`inpoint ${ffTime(si)}`); lines.push(`outpoint ${ffTime(si + c.duration)}`) }
-          return lines.join('\n')
-        }).join('\n')
-        try { await window.__TAURI__.core.invoke('save_text_file', { path: listPath, content }) }
-        catch (e) { window.toast?.(t('vc_fail') + ' : ' + e, 'error'); return }
-        totalDur = ordered.reduce((s, c) => s + c.duration, 0)
-        ok = await run(['-f', 'concat', '-safe', '0', '-i', listPath, '-c', 'copy', target], false)
-      } else {
-        const enc = ['-c:v', 'libx264', '-crf', '18', '-preset', 'medium', '-movflags', '+faststart']
-        const xf = buildXfade(ordered, true)
-        totalDur = xf.total
-        // Spot vignettes are extra picture inputs appended after the clips —
-        // painted at the xfade target size so overlay=0:0 lines up exactly.
-        const spotIdx = new Map()
-        let spotFiles = []
-        const xfW = xf.targetH === 1080 ? 1920 : 1280
-        const xfPlace = padPlacement(ordered, xfW, xf.targetH)
-        if (withMarkers && markers.some(m => m.fn === 'spot')) {
-          try {
-            const sp = await writeSpotPngs(xfW, xf.targetH, xfPlace)
-            spotFiles = sp.files
-            sp.spots.forEach((m, i) => spotIdx.set(m.id, ordered.length + i))
-          } catch (e) { window.toast?.(t('vc_fail') + ' : ' + e, 'error'); return }
-        }
-        const inputs = [...ordered.flatMap(c => ['-i', c.savedPath]), ...spotFiles.flatMap(p => ['-i', p])]
-        // Markers chain BEFORE drawtext — titles stay sharp above zoom/blur.
-        // The stream leaving the xfade chain is already 30 fps CFR, which is
-        // exactly what the zoompan node inside buildMarkerGraph requires.
-        const withFx = (g, vv, offsets, total) => {
-          if (withMarkers) {
-            const mg = buildMarkerGraph(vv, exportTimeMap(ordered, offsets, total), xfW, xf.targetH, spotIdx, xfPlace)
-            if (mg.graph) { g += ';' + mg.graph; vv = mg.out }
-          }
-          if (withTexts) { g += `;[${vv}]${buildDrawtextChain(exportTimeMap(ordered, offsets, total), xf.targetH)}[vtxt]`; vv = 'vtxt' }
-          return [g, vv]
-        }
-        let [graph, vOut] = withFx(xf.graph, xf.vOut, xf.offsets, xf.total)
-        ok = await run([...inputs, '-filter_complex', graph, '-map', `[${vOut}]`, '-map', `[${xf.aOut}]`, '-c:a', 'aac', '-b:a', '192k', ...enc, target], true)
-        if (!ok) {
-          // A clip without an audio stream breaks the acrossfade chain — say
-          // so, then redo the whole export video-only.
-          window.toast?.(t('vr_tr_no_audio'), 'info')
-          const xv = buildXfade(ordered, false)
-          const [g2, v2] = withFx(xv.graph, xv.vOut, xv.offsets, xv.total)
-          ok = await run([...inputs, '-filter_complex', g2, '-map', `[${v2}]`, '-an', ...enc, target], false)
-        }
+      const outPath = folder + lib.sep + base + '.mp4', outName = base + '.mp4'
+      jobLbl.textContent = t('vr_job_export'); jobEl.classList.add('on'); setJobFrac(null)
+      const plan = planRender({ clips: real, cfg: exportCfg })
+      const paths = [...new Set(real.filter(c => !c.image).map(c => c.savedPath))]
+      const sound = new Map(await Promise.all(paths.map(async p => [p, await hasAudioStream(p)])))
+      let spotFiles = []
+      if (markers.some(m => m.fn === 'spot')) {
+        try { spotFiles = await writeSpotPngs(plan.W, plan.H, plan.place) }
+        catch (e) { jobEl.classList.remove('on'); window.toast?.(t('vc_fail') + ' : ' + e, 'error'); return }
       }
-      if (ok && needFxPass) {
-        // Burn texts + markers over the concat result in one re-encode pass —
-        // the concat itself stays a lossless stream copy at the SOURCE
-        // resolution, so the px reference must be that stream's real size, not
-        // a guess (see the probe below; mixed-resolution concats are already
-        // best-effort in the demuxer anyway).
-        const offs = []; let acc = 0
-        for (const c of ordered) { offs.push(acc); acc += c.duration }
-        const map = exportTimeMap(ordered, offs, acc)
-        // zoompan's s= and the spot mask are HARD pixel geometry over the
-        // concat intermediate, so a guess is no longer merely cosmetic (it was,
-        // back when refW/refH only scaled drawtext): ordered[0].w/h is 0 for
-        // pre-adaptive .icevid projects and for a failed metadata probe, which
-        // would re-encode a 1080p montage down to 1280x720 and overlay a
-        // quadrant-sized vignette. Probe pre1 itself, fall back to the first
-        // clip's dims, and leave 0 (→ node skipped) rather than invent a size.
-        const probed = await probeVideoSize(pre1)
-        const refW = probed.w || ordered[0].w || 0, refH = probed.h || ordered[0].h || 0
-        const enc = ['-c:v', 'libx264', '-crf', '18', '-preset', 'medium', '-movflags', '+faststart', '-c:a', 'copy']
-        const fxTarget = withMusic ? pre2 : outPath
-        const fxRun = args => withMusic ? ffRaw(args) : runFF(args, outPath, outName, folder)
-        if (withMarkers) {
-          // Markers need extra overlay inputs / zoompan → full filter_complex.
-          const spotIdx = new Map()
-          let spotFiles = []
-          if (markers.some(m => m.fn === 'spot') && refW && refH) {
-            try {
-              const sp = await writeSpotPngs(refW, refH)
-              spotFiles = sp.files
-              sp.spots.forEach((m, i) => spotIdx.set(m.id, 1 + i))   // input 0 = pre1
-            } catch (e) { window.toast?.(t('vc_fail') + ' : ' + e, 'error'); return }
-          }
-          // fps=30 first when a zoom marker exists: zoompan re-times its
-          // output at ITS fps parameter, so normalizing the input keeps
-          // duration and audio sync for any source frame rate.
-          const segs = []
-          let v = '0:v'
-          if (markers.some(m => m.fn === 'zoom')) { segs.push('[0:v]fps=30[mfps]'); v = 'mfps' }
-          const mg = buildMarkerGraph(v, map, refW, refH, spotIdx)
-          if (mg.graph) { segs.push(mg.graph); v = mg.out }
-          if (withTexts) { segs.push(`[${v}]${buildDrawtextChain(map, refH)}[vtxt]`); v = 'vtxt' }
-          ok = await fxRun(['-i', pre1, ...spotFiles.flatMap(p => ['-i', p]), '-filter_complex', segs.join(';'), '-map', `[${v}]`, '-map', '0:a?', ...enc, fxTarget])
-        } else {
-          ok = await fxRun(['-i', pre1, '-vf', buildDrawtextChain(map, refH), ...enc, fxTarget])
-        }
-      }
-      if (ok && withMusic) await musicPass(needFxPass ? pre2 : pre1, outPath, totalDur, outName, folder)
+      const { args, total } = buildRenderArgs(plan, {
+        clips: real, texts, markers, music, outPath, spotFiles,
+        fontFile: 'C\\:/Windows/Fonts/arial.ttf',
+        hasAudio: p => !!sound.get(p),
+      })
+      const r = await ffJob(args, total, t('vr_job_export'))
+      // Temporary pictures, plus the intermediates older versions left behind.
+      for (const p of [...spotFiles, ...['.montage-pre.mp4', '.montage-txt.mp4', '.concat-list.txt'].map(n => lib.root + lib.sep + n)]) removeFile(p)
+      if (r.ok) {
+        trackRecentFile(outPath, outName)
+        window.dispatchEvent(new CustomEvent('iceample-library-changed', { detail: { folder } }))
+        import('./file-routes.js').then(m => m.toastSaved(t('vc_done') + ' : ' + outName, outPath)).catch(() => window.toast?.(t('vc_done') + ' : ' + outName, 'success'))
+      } else if (r.cancelled) { removeFile(outPath); window.toast?.(t('vr_job_cancelled'), 'info') }
+      else window.toast?.(t('vc_fail') + ' : ' + r.error, 'error')
     })
-  })
+  }
 
   // ── Drop video files ───────────────────────────────────────────────────────
-  lanesEl.addEventListener('iceample-drop', e => {
+  lanesEl.addEventListener('iceample-drop', async e => {
     const { file, clientX, clientY } = e.detail; if (!file) return
     const ext = file.name.toLowerCase()
     if (/\.icetpl$/.test(ext)) { loadTemplateFile(file.path); return }
-    if (!/\.(mp4|mov|webm|mkv|avi|m4v|3gp|ogv)$/.test(ext)) return
+    const isImg = IMG_EXT.test(ext)
+    if (!isImg && !/\.(mp4|mov|webm|mkv|avi|m4v|3gp|ogv)$/.test(ext)) return
     const sr = scrollWrap.getBoundingClientRect()
     const li = laneIdxFromY(clientY), time = Math.max(0, (clientX - sr.left + scrollWrap.scrollLeft) / ZOOM)
     // A drop ON a placeholder fills that slot (keeping its start/duration);
@@ -2288,7 +2487,9 @@ export function initVideoRec(body) {
     let ph = clips.find(c => c.placeholder && c.laneIdx === li && time >= c.startTime && time < c.startTime + c.duration)
     if (!ph && e.detail.vrEnd) ph = clips.filter(c => c.placeholder).sort((a, b) => a.startTime - b.startTime)[0]
     if (ph) { fillPlaceholder(ph, file.path, file.name); return }
-    const url = 'file://' + String(file.path).replace(/\\/g, '/')
+    if (isImg) { addImageMedia({ path: file.path, name: file.name }, li, e.detail.vrEnd ? null : time); return }
+    let url
+    try { url = await mediaUrl(file.path) } catch { return }
     const v = document.createElement('video'); v.preload = 'metadata'; v.src = url
     v.addEventListener('loadedmetadata', () => {
       const c = mountClip({ id: ++clipId, laneIdx: li, startTime: time, duration: v.duration || 10, srcDur: v.duration || null, w: v.videoWidth || 0, h: v.videoHeight || 0, savedPath: file.path, label: file.name })
@@ -2307,34 +2508,93 @@ export function initVideoRec(body) {
     }))
   }
   previewEl.addEventListener('iceample-drop', e => forwardDropToEnd(e.detail))
+  // A drop on the overlay lane: same handler, the Y position picks lane -1.
+  ovLane.addEventListener('iceample-drop', e => lanesEl.dispatchEvent(new CustomEvent('iceample-drop', { detail: e.detail, bubbles: false })))
   body.addEventListener('iceample-drop', e => {
-    if (lanesEl.contains(e.target) || e.target === lanesEl || previewEl.contains(e.target) || e.target === previewEl) return
+    if (lanesEl.contains(e.target) || e.target === lanesEl || previewEl.contains(e.target) || e.target === previewEl || ovLane.contains(e.target)) return
     forwardDropToEnd(e.detail)
   })
 
   // ── Playback ──────────────────────────────────────────────────────────────
-  // Find the clip CONTAINING a given timeline time (first lane wins). No
-  // "upcoming clip" fallback: in a gap the preview just pauses instead of
-  // pre-playing (and silently re-targeting the ffmpeg bar to) the next clip.
-  function clipAt(time) { return clips.find(c => c.startTime <= time && time < c.startTime + c.duration) || null }
+  // The preview follows the playhead: the main-lane clip under it (first lane
+  // wins; a gap shows black, like the export), the overlay clip on top, fades
+  // as opacity, speed as playbackRate, and the music. Paused, every playhead
+  // move (ruler click, arrows, grip drag) shows the exact frame.
+  const mainClipAt = time => clips.find(c => c.laneIdx >= 0 && !c.placeholder && c.startTime <= time && time < c.startTime + c.duration) || null
+  const ovClipAt = time => clips.find(c => c.laneIdx === -1 && !c.placeholder && c.startTime <= time && time < c.startTime + c.duration) || null
+  const srcTimeAt = (c, time) => (c.srcIn || 0) + Math.max(0, time - c.startTime) * fxOf(c).speed
+  function fadeAlpha(c, time) {
+    const fx = fxOf(c), rel = time - c.startTime, d = c.duration
+    let a = 1
+    if (fx.fadeIn > 0.01) a = Math.min(a, rel / Math.min(fx.fadeIn, d / 2))
+    if (fx.fadeOut > 0.01) a = Math.min(a, (d - rel) / Math.min(fx.fadeOut, d / 2))
+    return Math.max(0, Math.min(1, a))
+  }
+  function followTimeline(el, c, time) {
+    const fx = fxOf(c)
+    if (el.playbackRate !== fx.speed) el.playbackRate = fx.speed
+    el.volume = Math.min(1, fx.vol); el.muted = fx.vol <= 0.001
+    const want = srcTimeAt(c, time)
+    if (isPlaying) {
+      if (Math.abs(el.currentTime - want) > 0.3) el.currentTime = want
+      if (el.paused) el.play().catch(() => {})
+    } else {
+      if (!el.paused) el.pause()
+      if (Math.abs(el.currentTime - want) > 0.01) el.currentTime = want
+    }
+  }
+  // Music preview (the export mixes it the same way: offset, volume, 2 s fade).
+  const musicEl = new Audio(); musicEl.preload = 'auto'
+  routeMedia(musicEl)
+  let musicFor = null
+  function syncMusic(time) {
+    if (!music || !music.path || !isPlaying) { if (!musicEl.paused) musicEl.pause(); return }
+    if (musicFor !== music.path) {
+      musicFor = music.path
+      const u = mediaUrlSync(music.path)
+      if (u) musicEl.src = u
+      else mediaUrl(music.path).then(x => { if (musicFor === music.path) musicEl.src = x }).catch(() => {})
+    }
+    const rel = time - (music.start || 0)
+    if (rel < 0 || (music.duration && rel >= music.duration)) { if (!musicEl.paused) musicEl.pause(); return }
+    let vol = Math.min(1, music.volume ?? 1)
+    if (music.fadeOut) {
+      const end = Math.min(contentEnd(), (music.start || 0) + (music.duration || Infinity))
+      if (time > end - 2) vol *= Math.max(0, (end - time) / 2)
+    }
+    musicEl.volume = vol
+    if (Math.abs(musicEl.currentTime - rel) > 0.3) musicEl.currentTime = rel
+    if (musicEl.paused) musicEl.play().catch(() => {})
+  }
   let vidClip = null
   function syncVideoToTime(time) {
-    const c = clipAt(time)
-    if (!c) { vidClip = null; vidEl.pause(); return }   // gap: keep selection, pause preview
-    if (c !== vidClip) {
-      vidClip = c; selectClip(c)   // selectClip assigns vidEl.src once
-      vidEl.currentTime = (c.srcIn || 0) + Math.max(0, time - c.startTime)
-      if (isPlaying) vidEl.play().catch(() => {})
-    } else {
-      const expected = (c.srcIn || 0) + (time - c.startTime)
-      if (Math.abs(vidEl.currentTime - expected) > 0.3) vidEl.currentTime = expected
-      if (isPlaying && vidEl.paused) vidEl.play().catch(() => {})
+    const c = mainClipAt(time)
+    if (!c) { vidClip = null; vidEl.pause(); picEl.style.opacity = '0' }   // gap: black frame
+    else {
+      if (c !== vidClip) { vidClip = c; showClipMedia(c); if (selClip !== c && isPlaying) selectClip(c, true) }
+      picEl.style.opacity = String(fadeAlpha(c, time))
+      if (!c.image && vidEl.getAttribute('src')) followTimeline(vidEl, c, time)
     }
+    const o = ovClipAt(time)
+    if (o !== shownOv) showOverlayMedia(o)
+    if (o) {
+      ovlEl.style.opacity = String(fxOf(o).opacity / 100 * fadeAlpha(o, time))
+      if (!o.image && ovVid.getAttribute('src')) followTimeline(ovVid, o, time)
+    } else if (!ovVid.paused) ovVid.pause()
+    syncMusic(time)
+    emptyEl.style.display = clips.length ? 'none' : ''
+  }
+  function setPlayhead(time) {
+    playheadTime = Math.max(0, time)
+    playheadEl.style.left = (playheadTime * ZOOM) + 'px'; timeEl.textContent = fmtTime(playheadTime)
+    if (isPlaying) { playOffset = playheadTime; playStart = performance.now() / 1000 }
+    syncVideoToTime(playheadTime); updateTextOverlay(playheadTime); updateScrollbar()
   }
   function doPlay() {
     if (loopOn && loopStart != null && loopEnd != null && (playheadTime < loopStart || playheadTime >= loopEnd)) { playheadTime = loopStart; playheadEl.style.left = (playheadTime * ZOOM) + 'px' }
     isPlaying = true; btnPlay.innerHTML = '<i class="fa-solid fa-pause"></i>'
     playOffset = playheadTime; playStart = performance.now() / 1000
+    vidClip = null
     syncVideoToTime(playheadTime)
     function tick() {
       if (!isPlaying) return
@@ -2348,45 +2608,57 @@ export function initVideoRec(body) {
     }
     playRafId = requestAnimationFrame(tick)
   }
+  function stopMedia() { vidEl.pause(); ovVid.pause(); musicEl.pause() }
   function doPause() {
     if (!isPlaying) return; isPlaying = false; cancelAnimationFrame(playRafId)
     playheadTime = playOffset + (performance.now() / 1000 - playStart)
-    playheadEl.style.left = (playheadTime * ZOOM) + 'px'; timeEl.textContent = fmtTime(playheadTime)
-    vidEl.pause(); btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>'; updateScrollbar()
+    stopMedia(); btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>'
+    setPlayhead(playheadTime)
   }
   function doStop() {
     isPlaying = false; cancelAnimationFrame(playRafId)
-    playheadTime = 0; playheadEl.style.left = '0px'; timeEl.textContent = '0:00'
-    vidEl.pause(); vidEl.currentTime = 0; btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>'; updateScrollbar(); updateTextOverlay(0)
+    stopMedia(); btnPlay.innerHTML = '<i class="fa-solid fa-play"></i>'
+    setPlayhead(0)
   }
+  // Grip on the playhead (in the ruler): drag to scrub.
+  const phGrip = document.createElement('div'); phGrip.className = 'vr-ph-grip'; playheadEl.appendChild(phGrip)
+  phGrip.addEventListener('mousedown', e => {
+    if (e.button !== 0) return
+    e.preventDefault(); e.stopPropagation()
+    const sr = scrollWrap.getBoundingClientRect()
+    const onMove = ev => setPlayhead((ev.clientX - sr.left + scrollWrap.scrollLeft) / ZOOM)
+    const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
+    document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp)
+  })
   btnPlay.addEventListener('click', () => { isPlaying ? doPause() : doPlay() })
   btnStop.addEventListener('click', () => { doStop() })
   btnHome.addEventListener('click', () => goToStart())
   body.querySelector('#vr-split').addEventListener('click', () => splitAtPlayhead())
   function onTransport(e) {
     const a = e.detail.action
-    if (a === 'play') { if (e.detail.position != null) { playheadTime = e.detail.position; playheadEl.style.left = (playheadTime * ZOOM) + 'px' }; if (!isPlaying) doPlay() }
+    if (a === 'play') { if (e.detail.position != null) setPlayhead(e.detail.position); if (!isPlaying) doPlay() }
     else if (a === 'pause') doPause(); else doStop()
   }
   window.addEventListener('iceample-transport', onTransport)
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  function goToStart() { playheadTime = 0; playheadEl.style.left = '0px'; timeEl.textContent = fmtTime(0); if (isPlaying) { playOffset = 0; playStart = performance.now() / 1000; syncVideoToTime(0) }; updateScrollbar(); updateTextOverlay(0) }
+  function goToStart() { setPlayhead(0) }
   function splitAtPlayhead() {
     const tp = playheadTime, affected = clips.filter(c => c.startTime + 0.1 < tp && tp < c.startTime + c.duration - 0.1); if (!affected.length) return
     const removed = affected.map(snapClip), created = []
-    affected.forEach(c => { const cs = c.startTime, ce = cs + c.duration, si = c.srcIn || 0; unmountById(c.id); created.push(snapClip(mountClip({ ...snapClip(c), id: ++clipId, startTime: cs, duration: tp - cs, transition: null }))); created.push(snapClip(mountClip({ ...snapClip(c), id: ++clipId, startTime: tp, duration: ce - tp, srcIn: si + (tp - cs) }))) })
+    affected.forEach(c => { const cs = c.startTime, ce = cs + c.duration, si = c.srcIn || 0; unmountById(c.id); created.push(snapClip(mountClip({ ...snapClip(c), id: ++clipId, startTime: cs, duration: tp - cs, transition: null }))); created.push(snapClip(mountClip({ ...snapClip(c), id: ++clipId, startTime: tp, duration: ce - tp, srcIn: c.image ? 0 : si + (tp - cs) * fxOf(c).speed }))) })
     updateRuler(); updateScrollbar()
     pushHistory('vr split', () => { created.forEach(p => unmountById(p.id)); removed.forEach(mountClip); updateRuler(); updateScrollbar() }, () => { removed.forEach(r => unmountById(r.id)); created.forEach(mountClip); updateRuler(); updateScrollbar() })
   }
   function zoomBy(f) { const r = scrollWrap.getBoundingClientRect(); applyZoom(ZOOM * f, r.left + scrollWrap.clientWidth / 2) }
   function zoomReset() { const r = scrollWrap.getBoundingClientRect(); applyZoom(80, r.left + scrollWrap.clientWidth / 2) }
-  function movePlayhead(beats) { playheadTime = Math.max(0, playheadTime + beats * (60 / getBpm())); playheadEl.style.left = (playheadTime * ZOOM) + 'px'; timeEl.textContent = fmtTime(playheadTime); updateTextOverlay(playheadTime) }
+  function movePlayhead(beats) { setPlayhead(playheadTime + beats * (60 / getBpm())) }
+  function stepFrame(dir) { setPlayhead(Math.round(playheadTime * exportCfg.fps + dir) / exportCfg.fps) }
   function playLoopRegion() {
     if (loopStart == null || loopEnd == null || loopEnd <= loopStart) return
     loopOn = true; updateLoopUI()
-    playheadTime = loopStart; playheadEl.style.left = (loopStart * ZOOM) + 'px'; updateTextOverlay(loopStart)
-    if (isPlaying) { playOffset = loopStart; playStart = performance.now() / 1000; syncVideoToTime(loopStart) } else doPlay()
+    setPlayhead(loopStart)
+    if (!isPlaying) doPlay()
   }
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
@@ -2395,6 +2667,8 @@ export function initVideoRec(body) {
     if (!body.contains(a) && !body.matches(':hover')) return
     if (matchesShortcut('marquee-clear', e)) { clearRange(); return }
     if ((matchesShortcut('clip-delete', e) || e.key === 'Backspace') && rangeReady()) { e.preventDefault(); carveRange(loopStart, loopEnd); clearRange(); return }
+    if ((matchesShortcut('clip-delete', e) || e.key === 'Backspace') && selClip) { e.preventDefault(); deleteClip(selClip); return }
+    if (e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); stepFrame(e.key === 'ArrowRight' ? 1 : -1); return }
     if (matchesShortcut('marquee-cut', e))    { if (rangeReady()) { e.preventDefault(); carveRange(loopStart, loopEnd); clearRange() } return }
     if (matchesShortcut('loop-toggle', e)) {
       e.preventDefault()
@@ -2452,13 +2726,22 @@ export function initVideoRec(body) {
   })
 
   // ── Init ──────────────────────────────────────────────────────────────────
+  // The ffmpeg clip tools (cut, GIF, subtitles…) sit in a bar shown on demand.
+  const TOOLS_KEY = 'iceample:videorec:tools'
+  const showTools = on => { actionsEl.classList.toggle('hidden', !on); btnTools.classList.toggle('active', on); try { localStorage.setItem(TOOLS_KEY, on ? '1' : '0') } catch {} }
+  showTools((() => { try { return localStorage.getItem(TOOLS_KEY) === '1' } catch { return false } })())
+  btnTools.addEventListener('click', () => showTools(actionsEl.classList.contains('hidden')))
   updateRuler(); updateScrollbar(); playheadEl.style.left = '0px'
-  const resizeObs = new ResizeObserver(() => { clampPreviewH(); updateRuler(); updateScrollbar(); updateTextOverlay(playheadTime) })
-  resizeObs.observe(scrollWrap); resizeObs.observe(body)
+  previewReady = true
+  relayoutPreview(); syncVideoToTime(0)
+  const resizeObs = new ResizeObserver(() => { clampPreviewH(); updateRuler(); updateScrollbar(); relayoutPreview() })
+  resizeObs.observe(scrollWrap); resizeObs.observe(body); resizeObs.observe(previewEl)
 
   const cleanObs = new MutationObserver(() => {
     if (!document.contains(body)) {
       doStop()
+      if (curJob) window.__TAURI__?.core.invoke('ffmpeg_cancel', { job: curJob }).catch(() => {})
+      musicEl.removeAttribute('src')
       cancelPlacement()   // drops the armed capture listeners (document keydown)
       document.getElementById('vr-act-pop')?.remove()   // popup lives on body
       if (_vrCtx) { _vrCtx.remove(); _vrCtx = null }    // clip ctx menu too

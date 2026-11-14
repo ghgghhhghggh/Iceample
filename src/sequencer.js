@@ -4,6 +4,7 @@ import { t } from './i18n.js'
 import { registerTool } from './project.js'
 import { matchesShortcut } from './shortcuts.js'
 import { registerCommands, unregisterCommandsBy } from './commands.js'
+import { toastSaved } from './file-routes.js'
 
 let _ctx = null
 let _dest = null  // overridden to OfflineAudioContext.destination during bounce
@@ -702,11 +703,10 @@ export function initSequencer(body) {
 
       const wav    = encodeWAV(rendered)
       const base64 = bufToBase64(wav)
-      await invoke('save_binary_file', {
-        path: root + sep + 'Séquences Audio' + sep + name + '.wav',
-        base64
-      })
+      const outPath = root + sep + 'Séquences Audio' + sep + name + '.wav'
+      await invoke('save_binary_file', { path: outPath, base64 })
       window.dispatchEvent(new CustomEvent('iceample-library-changed', { detail: { folder: root + sep + 'Séquences Audio' } }))
+      toastSaved(t('ed_exported') + ' : ' + name + '.wav', outPath)
 
       btnSave.innerHTML = '<i class="fa-solid fa-check"></i>'
       btnSave.style.color = 'var(--color-active)'

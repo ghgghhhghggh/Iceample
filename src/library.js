@@ -1,6 +1,7 @@
 import { t } from './i18n.js'
 import { sendMedia } from './media-bus.js'
 import { routeMedia } from './devices.js'
+import { fileKind, openersFor, showOpenWithMenu, KIND_ICONS } from './file-routes.js'
 
 const LIBRARY_CATEGORIES = [
   { id: 'imported',  label: 'Importés'        },
@@ -380,7 +381,8 @@ function buildFolderItem(f, navigate) {
 function buildFileItem(f, folderPath, sep, body, openWindow) {
   const isSeq = f.name.endsWith('.iceseq')
   const isDaw = f.name.endsWith('.icedaw')
-  const icon  = isSeq ? 'fa-table-cells' : isDaw ? 'fa-film' : 'fa-music'
+  const icon  = isSeq ? 'fa-table-cells' : isDaw ? 'fa-film' : (KIND_ICONS[fileKind(f.name)] || 'fa-file')
+  const canOpenWith = openersFor(f.name).length > 0
 
   const item = document.createElement('div')
   item.className = 'lib-file-item'
@@ -388,6 +390,7 @@ function buildFileItem(f, folderPath, sep, body, openWindow) {
     <i class="fa-solid ${icon} lib-file-icon"></i>
     <span class="lib-file-name">${f.name}</span>
     <div class="lib-file-actions">
+      ${canOpenWith ? `<button class="lib-file-action lib-file-openwith" title="${t('open_with')}"><i class="fa-solid fa-arrow-up-right-from-square"></i></button>` : ''}
       <button class="lib-file-action lib-file-move" title="${t('lib_move_title')}"><i class="fa-solid fa-folder-arrow-down"></i></button>
       <button class="lib-file-action lib-file-rename" title="${t('lib_rename_title')}"><i class="fa-solid fa-pencil"></i></button>
       <button class="lib-file-action lib-file-delete" title="${t('lib_delete_title')}"><i class="fa-solid fa-trash"></i></button>
@@ -395,6 +398,11 @@ function buildFileItem(f, folderPath, sep, body, openWindow) {
   `
 
   if (!isSeq && !isDaw) item.addEventListener('dblclick', () => openLibraryFile(f, openWindow))
+  // "Open with…": every tool able to take this kind of file (file-routes.js).
+  if (canOpenWith) {
+    item.querySelector('.lib-file-openwith').addEventListener('click', e => { e.stopPropagation(); showOpenWithMenu(e.currentTarget, f) })
+    item.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); showOpenWithMenu(item, f) })
+  }
 
   // Drag vers piste
   item.addEventListener('mousedown', e => {

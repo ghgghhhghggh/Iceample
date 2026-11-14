@@ -1,6 +1,7 @@
 // metadata.js — Éditeur de métadonnées audio + vidéo avec gestion de pochette
 
 import { trackRecentFile } from './recent.js'
+import { mediaUrlSync } from './media-url.js'
 
 const AUDIO_EXTS = ['mp3','flac','ogg','opus','m4a','aiff','aif','wav','wma']
 const VIDEO_EXTS = ['mp4','mkv','mov','avi','webm','m4v']
@@ -284,8 +285,8 @@ export function initMetadata(body) {
     if (!p) return
     artworkPath = p
     artworkDirty = true
-    // Show local preview via file:// URL (works in Tauri WebView)
-    const url = 'file:///' + p.replace(/\\/g, '/')
+    // Local preview through the asset protocol (the webview refuses file://)
+    const url = mediaUrlSync(p)
     setArtwork(url, '⬤ Nouvelle pochette (non enregistrée)')
     artStatus.style.color = 'var(--warning)'
     markDirty()
@@ -318,7 +319,7 @@ export function initMetadata(body) {
       if (!currentPath) { window.toast?.('Ouvrez d\'abord un fichier audio', 'error'); return }
       artworkPath = path
       artworkDirty = true
-      setArtwork('file:///' + path.replace(/\\/g, '/'), '⬤ Nouvelle pochette (non enregistrée)')
+      setArtwork(mediaUrlSync(path), '⬤ Nouvelle pochette (non enregistrée)')
       artStatus.style.color = 'var(--warning)'
       markDirty()
     } else {
@@ -346,7 +347,7 @@ export function initMetadata(body) {
     }
     artworkPath = path
     artworkDirty = true
-    setArtwork('file:///' + path.replace(/\\/g, '/'), '⬤ Nouvelle pochette (non enregistrée)')
+    setArtwork(mediaUrlSync(path), '⬤ Nouvelle pochette (non enregistrée)')
     artStatus.style.color = 'var(--warning)'
     markDirty()
   })
@@ -359,6 +360,12 @@ export function initMetadata(body) {
   })
 
   saveBtn.addEventListener('click', saveMetadata)
+
+  // Audio or video file sent by "Open with…" (Library, Search, Recents).
+  body.addEventListener('iceample-media', e => {
+    const m = e.detail
+    if (m && m.path && (m.kind === 'audio' || m.kind === 'video')) loadFile(m.path)
+  })
 
   window.addEventListener('iceample-open-file', e => {
     const { path, ext } = e.detail

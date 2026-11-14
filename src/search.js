@@ -1,5 +1,6 @@
 import { t } from './i18n.js'
 import { routeMedia } from './devices.js'
+import { fileKind, openersFor, openWithDefault, showOpenWithMenu, KIND_ICONS } from './file-routes.js'
 
 export function initSearch(body) {
   body.classList.add('search-body')
@@ -71,7 +72,7 @@ export function initSearch(body) {
     const isDaw  = f.name.endsWith('.icedaw')
     const isMic  = f.name.endsWith('.icemic')
     const isProj = isSeq || isDaw || isMic
-    const icon   = isSeq ? 'fa-table-cells' : isDaw ? 'fa-film' : isMic ? 'fa-microphone' : 'fa-music'
+    const icon   = isSeq ? 'fa-table-cells' : isDaw ? 'fa-film' : isMic ? 'fa-microphone' : (KIND_ICONS[fileKind(f.name)] || 'fa-file')
 
     const item = document.createElement('div')
     item.className = 'search-result-item'
@@ -82,10 +83,17 @@ export function initSearch(body) {
     `
 
     if (!isProj) {
+      // Audio: click = preview. Anything else used to be "played" as audio and
+      // fail silently; it now opens in its default tool.
       item.addEventListener('click', e => {
         if (item.classList.contains('dragging')) return
-        togglePreview(item, f)
+        if (fileKind(f.name) === 'audio') togglePreview(item, f)
+        else openWithDefault(f)
       })
+    }
+    if (openersFor(f.name).length) {
+      item.title = t('open_with')
+      item.addEventListener('contextmenu', e => { e.preventDefault(); e.stopPropagation(); showOpenWithMenu(item, f) })
     }
 
     makeDraggable(item, f, icon)

@@ -53,6 +53,7 @@ window.toast = function(msg, type = 'info', duration = 3500) {
     el.classList.add('toast-out')
     setTimeout(() => el.remove(), 260)
   }, duration)
+  return el   // lets a caller add an action (see toastSaved in file-routes.js)
 }
 
 // ── Bounce utility ───────────────────────────────────────────────────────────

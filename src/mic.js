@@ -6,6 +6,7 @@ import { matchesShortcut } from './shortcuts.js'
 import { promptName, confirmUnsaved, showInfo } from './rename-dialog.js'
 import { registerCommands, unregisterCommandsBy } from './commands.js'
 import { getMicStream, makeInputSwitch } from './devices.js'
+import { toastSaved } from './file-routes.js'
 
 export function initMic(body) {
   body.classList.add('mic-body')
@@ -991,9 +992,11 @@ export function initMic(body) {
       const rendered = await offCtx.startRendering()
       const b64 = bufToBase64(encodeWAV(rendered))
       const { invoke } = window.__TAURI__.core
-      await invoke('save_binary_file', { path: root + sep + 'Séquences Audio' + sep + name + '.wav', base64: b64 })
+      const outPath = root + sep + 'Séquences Audio' + sep + name + '.wav'
+      await invoke('save_binary_file', { path: outPath, base64: b64 })
       window.dispatchEvent(new CustomEvent('iceample-library-changed', { detail: { folder: root + sep + 'Séquences Audio' } }))
       setBtnState(btnExport, 'ok')
+      toastSaved(t('ed_exported') + ' : ' + name + '.wav', outPath)
     } catch (e) { console.error(e); setBtnState(btnExport, 'err') }
     resetBtn(btnExport, 'fa-file-audio')
   })

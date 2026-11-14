@@ -4,6 +4,7 @@ import { pushHistory } from './history.js'
 import { matchesShortcut, getShortcut, formatBinding, DEFAULT_SHORTCUTS } from './shortcuts.js'
 import { registerCommands, unregisterCommandsBy } from './commands.js'
 import { themeColor } from './theme.js'
+import { toastSaved } from './file-routes.js'
 
 function injectFxMenuStyles() {
   if (document.getElementById('ed-fx-menu-styles')) return
@@ -692,6 +693,15 @@ export function initEditor(body) {
     const { invoke } = window.__TAURI__.core
     await loadBuffer(b64ToAB(await invoke('read_file_base64', { path: file.path })), file.name)
   })
+  // Audio file sent by "Open with…" (Library, Search, Recents) or another tool.
+  body.addEventListener('iceample-media', async e => {
+    const m = e.detail
+    if (!m || m.kind !== 'audio' || !m.path || !window.__TAURI__) return
+    try {
+      const b64 = await window.__TAURI__.core.invoke('read_file_base64', { path: m.path })
+      await loadBuffer(b64ToAB(b64), m.name)
+    } catch { window.toast?.(t('lib_read_error'), 'error') }
+  })
 
   // ── VST offline processing ────────────────────────────────────────────────
   function audioBufferToBase64(buf, startSample, numFrames) {
@@ -1269,7 +1279,7 @@ export function initEditor(body) {
       const { invoke } = window.__TAURI__.core
       await invoke('save_binary_file', { path, base64: ab2b64(encodeWAV(rendered)) })
       window.dispatchEvent(new CustomEvent('iceample-library-changed', { detail: { folder: root + sep + 'Modifiés' } }))
-      window.toast?.(t('ed_exported') + ': ' + name, 'success')
+      toastSaved(t('ed_exported') + ' : ' + name, path)
     } catch (e) {
       window.toast?.(t('ed_export_err') + ': ' + e, 'error')
     } finally {

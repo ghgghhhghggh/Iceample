@@ -20,6 +20,7 @@ export const IMAGE_TARGETS = [
   { id: 'watermark', labelKey: 'tool_watermark', icon: 'fa-droplet' },
   { id: 'palettes',  labelKey: 'tool_palettes',  icon: 'fa-palette' },
   { id: 'tool3d',    labelKey: 'tool_3d',        icon: 'fa-cube' },
+  { id: 'videorec',  labelKey: 'tool_videocut',  icon: 'fa-clapperboard' },
 ]
 
 export const VIDEO_TARGETS = [
@@ -35,7 +36,7 @@ export function sendMedia(toolId, media) {
 /**
  * Standard "send to…" popup. `getMedia` is called lazily on pick (so senders
  * only rasterize their canvas when actually needed) and may return a Promise.
- * opts: { self: toolIdToExclude, targets: IMAGE_TARGETS|VIDEO_TARGETS }
+ * opts: { self: toolIdToExclude, targets: IMAGE_TARGETS|VIDEO_TARGETS, title }
  */
 export function showSendMenu(anchor, getMedia, opts = {}) {
   document.getElementById('media-send-menu')?.remove()
@@ -48,7 +49,7 @@ export function showSendMenu(anchor, getMedia, opts = {}) {
   const close = () => { pop.remove(); document.removeEventListener('click', onDoc); document.removeEventListener('keydown', onKey, true) }
   const head = document.createElement('div')
   head.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--text-secondary);padding:5px 10px 4px'
-  head.textContent = t('send_to')
+  head.textContent = opts.title || t('send_to')
   pop.appendChild(head)
   targets.forEach(tg => {
     const b = document.createElement('button')

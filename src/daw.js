@@ -8,6 +8,7 @@ import { matchesShortcut } from './shortcuts.js'
 import { promptName, confirmUnsaved } from './rename-dialog.js'
 import { registerCommands, unregisterCommandsBy } from './commands.js'
 import { getMicStream, makeInputSwitch } from './devices.js'
+import { toastSaved } from './file-routes.js'
 
 function encodeWAV(audioBuffer) {
   const sr   = audioBuffer.sampleRate
@@ -1277,9 +1278,11 @@ export function initDAW(body) {
       const base64   = bufToBase64(encodeWAV(rendered))
       const sep      = root.includes('\\') ? '\\' : '/'
       const { invoke } = window.__TAURI__.core
-      await invoke('save_binary_file', { path: root + sep + 'Séquences Audio' + sep + name + '.wav', base64 })
+      const outPath = root + sep + 'Séquences Audio' + sep + name + '.wav'
+      await invoke('save_binary_file', { path: outPath, base64 })
       window.dispatchEvent(new CustomEvent('iceample-library-changed', { detail: { folder: root + sep + 'Séquences Audio' } }))
       setBtnState(btnExportWav, 'ok')
+      toastSaved(t('ed_exported') + ' : ' + name + '.wav', outPath)
     } catch(e) { console.error(e); setBtnState(btnExportWav, 'err') }
     resetBtn(btnExportWav, 'fa-file-audio')
   }

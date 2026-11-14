@@ -23,6 +23,8 @@ function saveEntries(entries) {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)) } catch {}
 }
 
+import { openWithDefault, openersFor, showOpenWithMenu } from './file-routes.js'
+
 export function trackRecentFile(path, name) {
   if (!path) return
   const ext = path.split('.').pop().toLowerCase()
@@ -46,9 +48,12 @@ function relativeTime(ts) {
 
 async function openFile(path, ext) {
   if (!window.__TAURI__) { window.toast?.('Tauri requis', 'error'); return }
-  // Dispatch event so library/other tools can handle it
-  const ev = new CustomEvent('iceample-open-file', { detail: { path, ext } })
-  window.dispatchEvent(ev)
+  // The tool that handles this kind of file (file-routes.js); other files keep
+  // the old broadcast (still handled by Metadata).
+  const name = String(path).split(/[\\/]/).pop()
+  if (!openWithDefault({ path, name })) {
+    window.dispatchEvent(new CustomEvent('iceample-open-file', { detail: { path, ext } }))
+  }
   trackRecentFile(path)
 }
 
@@ -142,7 +147,12 @@ export function initRecent(body) {
       `
 
       const [openBtn, folderBtn, removeBtn] = meta.querySelectorAll('button')
-      openBtn.addEventListener('click', e => { e.stopPropagation(); openFile(entry.path, entry.ext) })
+      openBtn.addEventListener('click', e => {
+        e.stopPropagation()
+        const f = { path: entry.path, name: entry.name || String(entry.path).split(/[\\/]/).pop() }
+        if (openersFor(f.name).length > 1) showOpenWithMenu(openBtn, f)
+        else openFile(entry.path, entry.ext)
+      })
       folderBtn.addEventListener('click', e => { e.stopPropagation(); openInExplorer(entry.path) })
       removeBtn.addEventListener('click', e => {
         e.stopPropagation()

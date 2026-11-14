@@ -2,6 +2,7 @@
 import { t } from './i18n.js'
 import { makeSendButton, imageMedia, IMAGE_TARGETS, VIDEO_TARGETS } from './media-bus.js'
 import { promptName } from './rename-dialog.js'
+import { createAudioDriver } from './audio-features.js'
 
 export function initParticles(body) {
   body.style.cssText = 'display:flex;flex-direction:column;height:100%;background:var(--surface);font-size:12px;font-family:inherit;'
@@ -67,7 +68,7 @@ export function initParticles(body) {
   // ── State (+ persistence) ──────────────────────────────────────────────────
   let state = {
     preset: 'neige', density: 1, speed: 1, size: 1, wind: 0, gravity: 0,
-    colorMode: 'preset', customColor: '', bgColor: '#101014', transparent: false, recSec: 5,
+    colorMode: 'preset', customColor: '', bgColor: '#101014', transparent: false, recSec: 5, react: 0.6,
     userPreset: '', sprite: '', spriteTint: false, emitterPoint: null,
   }
   const STATE_LS = 'iceample:particles:state'
@@ -168,6 +169,16 @@ export function initParticles(body) {
   }
   let alive = 0
   let emitAcc = 0
+  // Sound reaction (set each frame from the sound's values, see tick()).
+  const audio = createAudioDriver()
+  let fx = null, emitBoost = 1, sizePulse = 1, lastBeat = 0
+  function burst(n) {
+    while (n-- > 0 && alive < MAX) {
+      spawn()
+      const p = pool[alive - 1]
+      p.vx *= 1.7; p.vy *= 1.7
+    }
+  }
   let W = 0, H = 0
 
   const lerp = (r, k) => r[0] + (r[1] - r[0]) * k
@@ -230,7 +241,7 @@ export function initParticles(body) {
         if (p.tLen < trailKeep) p.tLen++
       }
     }
-    emitAcc += P.rate * state.density * dt
+    emitAcc += P.rate * state.density * dt * emitBoost
     let n = Math.floor(emitAcc)
     emitAcc -= n
     while (n-- > 0 && alive < MAX) spawn()
@@ -360,7 +371,7 @@ export function initParticles(body) {
     ctx.lineJoin = 'round'
     ctx.lineCap = 'round'
     const baseOp = P.opacity ?? 0.9
-    const szMul = state.size
+    const szMul = state.size * sizePulse
     for (let i = 0; i < alive; i++) {
       const p = pool[i]
       const prog = p.age / p.life
@@ -531,7 +542,18 @@ export function initParticles(body) {
     const raw = Math.min((ts - last) / 1000, 0.05)
     last = ts
     if (W) {
-      step(raw * state.speed)
+      fx = audio.features()
+      let speedMul = 1
+      if (fx) {
+        const r = state.react
+        speedMul  = 1 + r * (fx.level * 0.8 + fx.bass * 0.5)
+        emitBoost = 1 + r * fx.level * 2
+        sizePulse = 1 + r * fx.bass * 0.5
+        // A beat (the value jumps back to 1) fires a burst from the emitter.
+        if (fx.beat > 0.95 && lastBeat < 0.95) burst(Math.round(r * 70 * state.density))
+        lastBeat = fx.beat
+      } else { emitBoost = 1; sizePulse = 1; lastBeat = 0 }
+      step(raw * state.speed * speedMul)
       render()
       statAcc += raw
       if (statAcc > 0.5) {
@@ -552,6 +574,7 @@ export function initParticles(body) {
     updatePlayBtn()
     if (v) schedule()
     else stopLoop()
+    if (audio.mode === 'file') v ? audio.play() : audio.pause()
   }
   updatePlayBtn()
 
@@ -559,8 +582,8 @@ export function initParticles(body) {
   resetBtn.addEventListener('click', () => { prewarm(); if (!playing) render() })
 
   const onVis = () => {
-    if (document.hidden) { stopLoop(); if (saveT) saveState() }
-    else schedule()
+    if (document.hidden) { stopLoop(); if (saveT) saveState(); audio.pause() }
+    else { schedule(); if (playing && audio.mode === 'file') audio.play() }
   }
   document.addEventListener('visibilitychange', onVis)
 
@@ -859,6 +882,67 @@ export function initParticles(body) {
   sliderCtrl('gravity', t('pt_gravity'), -1,  1, 0.05, fmtNum)
 
   // ── Panel: colour source (preset palette / theme accent / custom) ──────────
+  // ── Panel: sound (the particles follow a sound file or the app's mix) ─────
+  panel.append(pLabel(t('audio_section')))
+  const audioRow = document.createElement('div')
+  audioRow.style.cssText = 'display:flex;gap:4px;'
+  const audioPickBtn = document.createElement('button')
+  audioPickBtn.style.cssText = GHOST + 'flex:1;'
+  audioPickBtn.innerHTML = `<i class="fa-solid fa-music"></i> <span></span>`
+  audioPickBtn.querySelector('span').textContent = t('audio_pick')
+  const audioMixBtn = document.createElement('button')
+  audioMixBtn.style.cssText = GHOST + 'width:30px;'
+  audioMixBtn.innerHTML = '<i class="fa-solid fa-sliders"></i>'
+  audioMixBtn.title = t('audio_mix')
+  const audioClearBtn = document.createElement('button')
+  audioClearBtn.style.cssText = GHOST + 'width:30px;'
+  audioClearBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>'
+  audioClearBtn.title = t('audio_clear')
+  audioRow.append(audioPickBtn, audioMixBtn, audioClearBtn)
+  const audioNameEl = document.createElement('div')
+  audioNameEl.style.cssText = 'font-size:11px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:14px;'
+  panel.append(audioRow, audioNameEl)
+  sliderCtrl('react', t('audio_react'), 0, 1, 0.05, v => Math.round(v * 100) + '%')
+
+  function refreshAudioUi() {
+    audioNameEl.textContent = audio.mode === 'file' ? audio.name : audio.mode === 'mix' ? t('audio_mix') : t('audio_none')
+    audioMixBtn.style.color = audio.mode === 'mix' ? 'var(--color-active)' : 'var(--text-primary)'
+    audioMixBtn.style.borderColor = audio.mode === 'mix' ? 'var(--color-active)' : 'var(--win-border)'
+    audioClearBtn.disabled = audio.mode === 'off'
+  }
+  async function loadSound(path, name) {
+    audioNameEl.textContent = t('audio_analysing')
+    try {
+      await audio.loadFile(path, name)
+      audio.element.loop = true
+      if (playing) audio.play()
+    } catch { window.toast?.(t('audio_failed'), 'error') }
+    refreshAudioUi()
+  }
+  audioPickBtn.addEventListener('click', async () => {
+    if (recording) return
+    try {
+      const f = await window.__TAURI__.core.invoke('pick_audio_file')
+      if (f?.path) loadSound(f.path, f.name)
+    } catch {}
+  })
+  audioMixBtn.addEventListener('click', () => {
+    if (recording) return
+    if (audio.mode === 'mix') audio.clear(); else audio.useMix()
+    refreshAudioUi()
+  })
+  audioClearBtn.addEventListener('click', () => {
+    if (recording) return
+    audio.clear(); fx = null
+    refreshAudioUi()
+  })
+  // "Open with…" from the Library / Search / Recents, or a sound sent by another tool.
+  body.addEventListener('iceample-media', e => {
+    const m = e.detail
+    if (m && m.kind === 'audio' && m.path) loadSound(m.path, m.name)
+  })
+  refreshAudioUi()
+
   panel.append(pLabel(t('pt_colors')))
   const segRow = document.createElement('div')
   segRow.style.cssText = 'display:flex;gap:4px;'
@@ -1049,16 +1133,31 @@ export function initParticles(body) {
     const list = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
     return list.find(m => window.MediaRecorder?.isTypeSupported?.(m)) || ''
   }
+  // With a sound file loaded the capture covers the whole sound, sound included
+  // (it starts from the beginning and stops when the sound ends).
+  const withSound = () => audio.mode === 'file' && !!audio.element
+  const recordMs = () => withSound() ? audio.duration * 1000 : state.recSec * 1000
   function recordWebm(ms) {
     return new Promise((resolve, reject) => {
       if (!window.MediaRecorder) { reject(new Error(t('pt_norec'))); return }
       recording = true
+      const sound = withSound()
+      const el = sound ? audio.element : null
+      const wasLoop = el ? el.loop : false
+      if (sound) { el.loop = false; audio.seek(0) }
       const wasPlaying = playing
       if (!playing) setPlaying(true)
       let stream
       try { stream = canvas.captureStream(30) }
-      catch (e) { recording = false; if (!wasPlaying) setPlaying(false); reject(e); return }
-      const mime = pickMime()
+      catch (e) { recording = false; if (el) el.loop = wasLoop; if (!wasPlaying) setPlaying(false); reject(e); return }
+      if (sound) {
+        const tr = audio.audioTrack()
+        if (tr) stream.addTrack(tr)
+        audio.play()
+      }
+      const mime = sound
+        ? (['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'].find(m => window.MediaRecorder?.isTypeSupported?.(m)) || '')
+        : pickMime()
       let rec
       try {
         rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
@@ -1072,11 +1171,14 @@ export function initParticles(body) {
       const chunks = []
       // Stop the capture track on every exit — a live CanvasCaptureTrack keeps
       // copying frames off the canvas on each paint until GC.
+      const onEnded = () => { try { if (rec.state !== 'inactive') rec.stop() } catch {} }
       const done = fn => {
         recording = false
         curRec = null
         stream.getTracks().forEach(tr => tr.stop())
+        if (el) { el.removeEventListener('ended', onEnded); el.loop = wasLoop }
         if (!wasPlaying) setPlaying(false)
+        else if (el && wasLoop) audio.play()   // the sound keeps looping with the animation
         fn()
       }
       rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data) }
@@ -1084,7 +1186,9 @@ export function initParticles(body) {
       rec.onerror = e => done(() => reject(e.error || new Error('MediaRecorder')))
       try { rec.start(120) }
       catch (e) { done(() => reject(e)); return }
-      setTimeout(() => { try { if (rec.state !== 'inactive') rec.stop() } catch {} }, ms)
+      if (el) el.addEventListener('ended', onEnded)
+      // Safety net for the sound case, the timer itself otherwise.
+      setTimeout(onEnded, sound ? ms + 2000 : ms)
     })
   }
   function bufToB64(buf) {
@@ -1098,7 +1202,7 @@ export function initParticles(body) {
   async function getSendMedia(targetId) {
     if (VIDEO_TARGETS.some(v => v.id === targetId)) {
       if (recording) return null
-      const ms = state.recSec * 1000
+      const ms = recordMs()
       window.toast?.(t('pt_recording'), 'info', ms)
       const blob = await recordWebm(ms)
       if (torn) return null   // window closed mid-capture: nothing to hand the bus
@@ -1134,7 +1238,7 @@ export function initParticles(body) {
   exportWebmBtn.addEventListener('click', async () => {
     if (recording || !W) return
     if (!window.MediaRecorder) { window.toast?.(t('pt_norec'), 'error'); return }
-    const ms = state.recSec * 1000
+    const ms = recordMs()
     exportWebmBtn.disabled = true
     exportWebmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>'
     window.toast?.(t('pt_recording'), 'info', ms)
@@ -1171,6 +1275,7 @@ export function initParticles(body) {
     // a live MediaRecorder + captureStream track keep running (and pop a save
     // dialog when the timer fires) long after the window is gone
     try { if (curRec && curRec.state !== 'inactive') curRec.stop() } catch {}
+    audio.dispose()
     if (saveT) saveState()
     stopLoop()
     closeUserMenu?.()
